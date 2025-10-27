@@ -61,7 +61,6 @@ heartsync-app/
 ├── app/                    # ⭐ Tất cả screens ở đây
 ├── src/
 │   ├── components/ui/      # ⭐ Base UI components
-│   └── config/theme.ts     # ⭐ Design system
 ```
 
 ---
