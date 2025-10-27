@@ -1,18 +1,26 @@
-import { Ionicons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
 import React from "react";
+import { Ionicons } from "@expo/vector-icons"; // <-- Vẫn cần cho các tab khác
+
+// --- Bảng màu ---
+const COLORS = {
+  primary: "#b21e46",
+  textSecondary: "#94A3B8",
+  white: "#FFFFFF",
+  gray: "#E5E7EB",
+};
+// -----------------
 
 export default function MainLayout() {
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: "#4F46E5",
-        tabBarInactiveTintColor: "#94A3B8",
+        // BỎ tabBarActiveTintColor và tabBarInactiveTintColor ở đây
         tabBarStyle: {
-          backgroundColor: "#fff",
+          backgroundColor: COLORS.white,
           borderTopWidth: 0.5,
-          borderTopColor: "#E5E7EB",
+          borderTopColor: COLORS.gray,
           height: 60,
           paddingBottom: 8,
         },
@@ -21,40 +29,42 @@ export default function MainLayout() {
       <Tabs.Screen
         name="discover"
         options={{
-          title: "Discover",
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="heart-outline" size={size} color={color} />
-          ),
+          // TẤT CẢ options đã bị xóa, vì discover/_layout.tsx
+          // (file ở bước B) sẽ tự cung cấp
         }}
       />
 
       <Tabs.Screen
         name="matches"
         options={{
+          // Giữ nguyên options cho tab này
           title: "Matches",
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="chatbubbles-outline" size={size} color={color} />
+            <Ionicons name="heart-outline" size={size} color={color} />
           ),
+          tabBarActiveTintColor: COLORS.primary,
+          tabBarInactiveTintColor: COLORS.textSecondary,
         }}
       />
 
       <Tabs.Screen
         name="messages"
         options={{
+          // Giữ nguyên options cho tab này
           title: "Messages",
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="mail-outline" size={size} color={color} />
+            <Ionicons name="chatbubbles-outline" size={size} color={color} />
           ),
+          tabBarActiveTintColor: COLORS.primary,
+          tabBarInactiveTintColor: COLORS.textSecondary,
         }}
       />
 
       <Tabs.Screen
         name="profile"
         options={{
-          title: "Profile",
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="person-outline" size={size} color={color} />
-          ),
+          // TẤT CẢ options đã bị xóa, vì profile/_layout.tsx
+          // (file ở bước A) sẽ tự cung cấp
         }}
       />
     </Tabs>
