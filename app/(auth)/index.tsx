@@ -1,11 +1,11 @@
 import { router } from "expo-router";
 import React from "react";
 import {
+  SafeAreaView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
-  SafeAreaView,
 } from "react-native";
 // Import icons
 import { FontAwesome, Ionicons } from "@expo/vector-icons";
@@ -33,13 +33,13 @@ export default function AuthIndexScreen() {
       {/* Phần logo và tiêu đề */}
       <View style={styles.headerContainer}>
         <View style={styles.logoSuperOuter}>
-  <View style={styles.logoOuter}>
-    <View style={styles.logoInner}>
-      <FontAwesome name="heart" size={50} color={COLORS.white} />
-    </View>
-  </View>
-</View>
-        <Text style={styles.title}>HeartSync</Text>
+          <View style={styles.logoOuter}>
+            <View style={styles.logoInner}>
+              <FontAwesome name="heart" size={50} color={COLORS.white} />
+            </View>
+          </View>
+        </View>
+        <Text style={styles.title}>Chilling Date</Text>
         <Text style={styles.slogan}>
           Where Hearts Connect, Love Finds Its Sync.
         </Text>
@@ -207,6 +207,6 @@ const styles = StyleSheet.create({
   linkText: {
     textDecorationLine: "underline",
     fontWeight: "600",
-    color: COLORS.primary, 
+    color: COLORS.primary,
   },
 });
