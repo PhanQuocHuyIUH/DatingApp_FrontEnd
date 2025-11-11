@@ -1,20 +1,20 @@
 // app/(main)/discover/index.tsx
 
+import {
+  MaterialCommunityIcons,
+  MaterialIcons,
+} from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
+import { Link } from "expo-router";
+import { StatusBar } from "expo-status-bar";
 import React from "react";
 import {
   ImageBackground,
   StyleSheet,
   Text,
-  View,
   TouchableOpacity,
+  View,
 } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
-import {
-  MaterialIcons,
-  MaterialCommunityIcons,
-} from "@expo/vector-icons";
-import { StatusBar } from "expo-status-bar";
-import { Link } from "expo-router";
 
 // --- Bảng màu ---
 const COLORS = {
