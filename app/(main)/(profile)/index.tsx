@@ -1,12 +1,18 @@
+import {
+  Feather,
+  MaterialCommunityIcons,
+  MaterialIcons,
+} from "@expo/vector-icons";
+import { Link } from "expo-router";
 import React, { useState } from "react";
 import {
-  ScrollView,
-  View,
-  Text,
-  StyleSheet,
   Image,
+  ScrollView,
+  StyleSheet,
+  Text,
   TouchableOpacity,
   Button,
+  View,
 } from "react-native";
 import { Link, router } from "expo-router";
 import {
@@ -14,6 +20,8 @@ import {
   MaterialCommunityIcons,
   Feather,
 } from "@expo/vector-icons";
+
+
 
 
 // --- Bảng màu ---
@@ -80,7 +88,11 @@ export default function ProfileScreen() {
 
         <Text style={styles.profileName}>
           Joshua Edwards, 29{" "}
-          <MaterialIcons name="check-circle" size={20} color={COLORS.blueCheck} />
+          <MaterialIcons
+            name="check-circle"
+            size={20}
+            color={COLORS.blueCheck}
+          />
         </Text>
 
         <Link href="edit" asChild>
@@ -148,7 +160,7 @@ export default function ProfileScreen() {
         <View>
           {/* Banner Premium */}
           <View style={styles.premiumBanner}>
-            <Text style={styles.premiumTitle}>HeartSync Premium</Text>
+            <Text style={styles.premiumTitle}>Chilling Date Premium</Text>
             <Text style={styles.premiumSubtitle}>
               Unlock exclusive features and supercharge your dating experience.
             </Text>
@@ -164,7 +176,9 @@ export default function ProfileScreen() {
               <Text style={[styles.tableHeader, styles.tableCellName]}>
                 Whats included
               </Text>
-              <Text style={[styles.tableHeader, styles.tableCellCheck]}>Free</Text>
+              <Text style={[styles.tableHeader, styles.tableCellCheck]}>
+                Free
+              </Text>
               <Text style={[styles.tableHeader, styles.tableCellCheck]}>
                 Premium
               </Text>

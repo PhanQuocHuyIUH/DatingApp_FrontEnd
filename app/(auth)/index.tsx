@@ -1,6 +1,7 @@
 import { router } from "expo-router";
 import React from "react";
 import {
+  SafeAreaView,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -46,7 +47,11 @@ export default function AuthIndexScreen() {
             </View>
           </View>
         </View>
-        <Text style={styles.title}>HeartSync</Text>
+
+
+
+        <Text style={styles.title}>Chilling Date</Text>
+
         <Text style={styles.slogan}>
           Where Hearts Connect, Love Finds Its Sync.
         </Text>

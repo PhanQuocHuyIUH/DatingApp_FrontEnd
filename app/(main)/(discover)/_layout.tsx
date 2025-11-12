@@ -1,9 +1,9 @@
 // app/(main)/discover/_layout.tsx
 
+import { Feather, Ionicons } from "@expo/vector-icons";
+import { Stack, router } from "expo-router";
 import React from "react";
-import { Stack,router } from "expo-router";
-import { TouchableOpacity, View, StyleSheet } from "react-native";
-import { Ionicons, Feather } from "@expo/vector-icons";
+import { StyleSheet, TouchableOpacity, View } from "react-native";
 
 // --- Bảng màu ---
 const COLORS = {
@@ -33,9 +33,9 @@ export default function DiscoverStackLayout() {
           ),
           tabBarActiveTintColor: COLORS.primary,
           tabBarInactiveTintColor: COLORS.textSecondary,
-          
+
           // Options cho Header
-          headerTitle: "HeartSync",
+          headerTitle: "Chilling Date",
           headerTitleAlign: "center",
           headerTitleStyle: {
             fontWeight: "700",
@@ -74,22 +74,22 @@ export default function DiscoverStackLayout() {
           headerShown: true,
         }}
       />
-      
+
       {/* --- MÀN HÌNH CHI TIẾT (KẾ THỪA HEADER) --- */}
-      <Stack.Screen 
-        name="[id]" 
-        options={{ 
+      <Stack.Screen
+        name="[id]"
+        options={{
           headerShown: true, // Hiển thị header (sẽ dùng chung header của Stack)
-        }} 
+        }}
       />
       {/* ------------------------------------------- */}
 
-      <Stack.Screen 
-        name="filters" 
-        options={{ 
-          title: "Filters", 
-          presentation: "modal"
-        }} 
+      <Stack.Screen
+        name="filters"
+        options={{
+          title: "Filters",
+          presentation: "modal",
+        }}
       />
     </Stack>
   );
