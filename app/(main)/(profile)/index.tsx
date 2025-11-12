@@ -3,7 +3,6 @@ import {
   MaterialCommunityIcons,
   MaterialIcons,
 } from "@expo/vector-icons";
-import { Link } from "expo-router";
 import React, { useState } from "react";
 import {
   Image,
@@ -15,11 +14,6 @@ import {
   View,
 } from "react-native";
 import { Link, router } from "expo-router";
-import {
-  MaterialIcons,
-  MaterialCommunityIcons,
-  Feather,
-} from "@expo/vector-icons";
 
 
 
