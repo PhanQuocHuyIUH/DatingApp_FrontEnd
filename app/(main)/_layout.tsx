@@ -27,7 +27,7 @@ export default function MainLayout() {
     >
       {/* Discover */}
       <Tabs.Screen
-        name="(discover)/index"
+        name="(discover)"
         options={{
           title: "Discover",
           tabBarIcon: ({ color, size, focused }) => (
@@ -57,7 +57,7 @@ export default function MainLayout() {
 
       {/* Messages */}
       <Tabs.Screen
-        name="(messages)/index"
+        name="(messages)"
         options={{
           title: "Messages",
           tabBarIcon: ({ color, size, focused }) => (
@@ -72,7 +72,7 @@ export default function MainLayout() {
 
       {/* Profile */}
       <Tabs.Screen
-        name="(profile)/index"
+        name="(profile)"
         options={{
           title: "Profile",
           tabBarIcon: ({ color, size, focused }) => (
