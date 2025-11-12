@@ -11,8 +11,18 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
+  Button,
   View,
 } from "react-native";
+import { Link, router } from "expo-router";
+import {
+  MaterialIcons,
+  MaterialCommunityIcons,
+  Feather,
+} from "@expo/vector-icons";
+
+
+
 
 // --- Bảng màu ---
 const COLORS = {
@@ -47,12 +57,19 @@ export default function ProfileScreen() {
     />
   );
 
+  const handleLogout = async () => {
+    router.replace("/auth/login"); // 👈 Quay về trang đăng nhập
+  };
+
   return (
     <ScrollView
       style={styles.container}
       showsVerticalScrollIndicator={false}
       contentContainerStyle={{ paddingBottom: 40 }}
     >
+      <View style={{ marginTop: 20 }}>
+        <Button title="Đăng xuất" color="#b21e46" onPress={handleLogout} />
+      </View>
       {/* --- Phần Profile Header --- */}
       <View style={styles.profileHeader}>
         <View style={styles.avatarContainer}>

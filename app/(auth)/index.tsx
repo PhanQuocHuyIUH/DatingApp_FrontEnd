@@ -6,26 +6,34 @@ import {
   Text,
   TouchableOpacity,
   View,
+  SafeAreaView,
+  Alert,
 } from "react-native";
-// Import icons
 import { FontAwesome, Ionicons } from "@expo/vector-icons";
 
-// --- Bảng màu mới ---
 const COLORS = {
-  primary: "#b21e46", // Đỏ đô
-  secondary: "#fae0e7", // Hồng nhạt
-  accent: "#cc5073", // Màu nhấn
+  primary: "#b21e46",
+  secondary: "#fae0e7",
+  accent: "#cc5073",
   text: "#1F2937",
   textSecondary: "#6B7280",
   white: "#FFFFFF",
   black: "#000000",
   facebook: "#1877F2",
 };
-// ----------------------
 
 export default function AuthIndexScreen() {
-  const handleLogin = () => {
-    router.replace("/(main)");
+  const handleAppleLogin = () => {
+    Alert.alert("Coming Soon", "Apple login will be implemented soon");
+  };
+
+  const handleFacebookLogin = () => {
+    Alert.alert("Coming Soon", "Facebook login will be implemented soon");
+  };
+
+  const handlePhoneLogin = () => {
+    // Chuyển đến màn hình login với email/password
+    router.push("/(auth)/login");
   };
 
   return (
@@ -39,7 +47,11 @@ export default function AuthIndexScreen() {
             </View>
           </View>
         </View>
+
+
+
         <Text style={styles.title}>Chilling Date</Text>
+
         <Text style={styles.slogan}>
           Where Hearts Connect, Love Finds Its Sync.
         </Text>
@@ -49,7 +61,7 @@ export default function AuthIndexScreen() {
       <View style={styles.buttonContainer}>
         <TouchableOpacity
           style={[styles.button, styles.appleButton]}
-          onPress={handleLogin}
+          onPress={handleAppleLogin}
         >
           <FontAwesome
             name="apple"
@@ -64,7 +76,7 @@ export default function AuthIndexScreen() {
 
         <TouchableOpacity
           style={[styles.button, styles.facebookButton]}
-          onPress={handleLogin}
+          onPress={handleFacebookLogin}
         >
           <FontAwesome
             name="facebook-square"
@@ -77,15 +89,23 @@ export default function AuthIndexScreen() {
 
         <TouchableOpacity
           style={[styles.button, styles.phoneButton]}
-          onPress={handleLogin}
+          onPress={handlePhoneLogin}
         >
           <Ionicons
-            name="keypad-outline"
+            name="mail-outline"
             size={22}
             color={COLORS.white}
             style={styles.icon}
           />
-          <Text style={styles.buttonText}>Use phone number</Text>
+          <Text style={styles.buttonText}>Sign in with Email</Text>
+        </TouchableOpacity>
+
+        {/* Register Button */}
+        <TouchableOpacity
+          style={[styles.button, styles.registerButton]}
+          onPress={() => router.push("/(auth)/register")}
+        >
+          <Text style={styles.registerButtonText}>Create New Account</Text>
         </TouchableOpacity>
       </View>
 
@@ -110,7 +130,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 32, // Tăng lề hai bên
+    paddingHorizontal: 32,
     paddingTop: 80,
     paddingBottom: 40,
   },
@@ -118,32 +138,28 @@ const styles = StyleSheet.create({
     alignItems: "center",
     width: "100%",
   },
-  // --- Logo Styles ---
   logoSuperOuter: {
-    // Vòng 1 (Ngoài cùng - MỚI)
     width: 180,
     height: 180,
     borderRadius: 90,
-    backgroundColor: COLORS.secondary, // Màu hồng nhạt
+    backgroundColor: COLORS.secondary,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 20, // Di chuyển marginBottom ra ngoài cùng
+    marginBottom: 20,
   },
   logoOuter: {
-    // Vòng 2 (Ở giữa)
     width: 140,
     height: 140,
     borderRadius: 70,
-    backgroundColor: COLORS.accent, // Thêm vòng màu trắng để tách biệt
+    backgroundColor: COLORS.accent,
     alignItems: "center",
     justifyContent: "center",
   },
   logoInner: {
-    // Vòng 3 (Trong cùng)
     width: 100,
     height: 100,
     borderRadius: 50,
-    backgroundColor: COLORS.primary, // Màu đỏ đô
+    backgroundColor: COLORS.primary,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -158,7 +174,6 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     textAlign: "center",
   },
-  // --- Button Styles ---
   buttonContainer: {
     width: "90%",
     marginTop: 40,
@@ -187,12 +202,21 @@ const styles = StyleSheet.create({
     color: COLORS.white,
   },
   facebookButton: {
-    backgroundColor: COLORS.facebook, // Giữ màu gốc của Facebook
+    backgroundColor: COLORS.facebook,
   },
   phoneButton: {
-    backgroundColor: COLORS.primary, // Màu đỏ đô
+    backgroundColor: COLORS.primary,
   },
-  // --- Footer Styles ---
+  registerButton: {
+    backgroundColor: COLORS.white,
+    borderWidth: 2,
+    borderColor: COLORS.primary,
+  },
+  registerButtonText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: COLORS.primary,
+  },
   footerContainer: {
     width: "100%",
     alignItems: "center",
