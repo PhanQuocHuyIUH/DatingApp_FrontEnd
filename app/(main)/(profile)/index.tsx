@@ -1,392 +1,365 @@
+import React, { useCallback, useState } from "react";
+import {
+  ScrollView,
+  View,
+  Text,
+  StyleSheet,
+  Image,
+  TouchableOpacity,
+  ActivityIndicator,
+  RefreshControl,
+  Alert,
+} from "react-native";
+import { Stack, useRouter, useFocusEffect } from "expo-router";
 import {
   Feather,
   MaterialCommunityIcons,
-  MaterialIcons,
+  Ionicons,
+  FontAwesome5,
+  Entypo,
+  SimpleLineIcons,
+  AntDesign,
 } from "@expo/vector-icons";
-import React, { useState } from "react";
-import {
-  Image,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  Button,
-  View,
-} from "react-native";
-import { Link, router } from "expo-router";
+import { userService } from "../../../services/userService";
+import { authService } from "../../../services/authService";
 
-
-
-
-// --- Bảng màu ---
 const COLORS = {
-  primary: "#b21e46", // Đỏ đô
-  primaryLight: "#cc5073", // Đỏ đô nhạt
-  secondary: "#fae0e7", // Hồng nhạt
+  primary: "#b21e46",
+  primaryLight: "#cc5073",
+  secondary: "#fae0e7",
   text: "#1F2937",
   textSecondary: "#6B7280",
   white: "#FFFFFF",
   gray: "#E5E7EB",
-  blueCheck: "#3B82F6", // Giữ màu xanh cho checkmark
+  lightGray: "#F3F4F6",
 };
 
-// --- Dữ liệu giả cho bảng ---
-const features = [
-  { name: "Unlimited swipes", free: true, premium: true },
-  { name: "Advanced filters", free: true, premium: true },
-  { name: "Remove ads", free: false, premium: true },
-  { name: "Undo accidental left swipes", free: false, premium: true },
-  { name: "Push you profile to more viewers", free: false, premium: true },
-];
+const ProfileInfo = ({ icon, label, value }) => (
+  <View style={styles.infoRow}>
+    {icon}
+    <Text style={styles.infoLabel}>{label}</Text>
+    <Text style={styles.infoValue}>{value}</Text>
+  </View>
+);
+
+const Pill = ({ label }) => (
+  <View style={styles.pill}>
+    <Text style={styles.pillText}>{label}</Text>
+  </View>
+);
 
 export default function ProfileScreen() {
-  const [activeTab, setActiveTab] = useState("Plans");
+  const router = useRouter();
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-  // Component cho Checkbox
-  const Checkbox = ({ checked }: { checked: boolean }) => (
-    <MaterialCommunityIcons
-      name={checked ? "checkbox-marked" : "checkbox-blank-outline"}
-      size={24}
-      color={checked ? COLORS.primary : COLORS.gray}
-    />
-  );
-
-  const handleLogout = async () => {
-    router.replace("/auth/login"); // 👈 Quay về trang đăng nhập
+  const fetchProfile = async () => {
+    try {
+      const response = await userService.getMyProfile();
+      if (response.success) {
+        setUser(response.data.user);
+      } else {
+        Alert.alert("Error", "Failed to fetch profile.");
+      }
+    } catch (error) {
+      console.error("Fetch profile error:", error);
+      Alert.alert("Error", "An error occurred while fetching your profile.");
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   };
 
+  useFocusEffect(
+    useCallback(() => {
+      setLoading(true);
+      fetchProfile();
+    }, [])
+  );
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    fetchProfile();
+  }, []);
+
+  const handleLogout = async () => {
+    await authService.logout();
+    router.replace("/(auth)/login");
+  };
+
+  const getAge = (dob) => {
+    if (!dob) return "";
+    const birthDate = new Date(dob);
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const m = today.getMonth() - birthDate.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    return age;
+  };
+
+  if (loading && !user) {
+    return (
+      <View style={styles.centered}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+      </View>
+    );
+  }
+
+  if (!user) {
+    return (
+      <View style={styles.centered}>
+        <Text>Could not load profile.</Text>
+        <TouchableOpacity onPress={fetchProfile}>
+          <Text style={{ color: COLORS.primary, marginTop: 10 }}>
+            Try again
+          </Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  const mainPhoto =
+    user.photos?.find((p) => p.isMain)?.url ||
+    user.photos?.[0]?.url ||
+    "https://placehold.co/400/fae0e7/b21e46?text=No+Photo";
+
   return (
-    <ScrollView
-      style={styles.container}
-      showsVerticalScrollIndicator={false}
-      contentContainerStyle={{ paddingBottom: 40 }}
-    >
-      <View style={{ marginTop: 20 }}>
-        <Button title="Đăng xuất" color="#b21e46" onPress={handleLogout} />
-      </View>
-      {/* --- Phần Profile Header --- */}
-      <View style={styles.profileHeader}>
-        <View style={styles.avatarContainer}>
-          <Image
-            source={{
-              // Ảnh placeholder, bạn có thể thay bằng ảnh thật
-              uri: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=387&q=80",
-            }}
-            style={styles.avatar}
-          />
-          {/* Badge tiến độ */}
-          <View style={styles.progressBadge}>
-            <Text style={styles.progressText}>45% complete</Text>
-          </View>
-        </View>
-
-        <Text style={styles.profileName}>
-          Joshua Edwards, 29{" "}
-          <MaterialIcons
-            name="check-circle"
-            size={20}
-            color={COLORS.blueCheck}
-          />
-        </Text>
-
-        <Link href="edit" asChild>
-          <TouchableOpacity>
-            <Text style={styles.editProfileLink}>
-              Edit your profile <Feather name="chevron-right" size={16} />
-            </Text>
-          </TouchableOpacity>
-        </Link>
-      </View>
-
-      {/* --- Phần Verification Banner --- */}
-      <TouchableOpacity style={styles.verificationBanner}>
-        <MaterialCommunityIcons
-          name="shield-check-outline"
-          size={32}
-          color={COLORS.primary}
-          style={styles.bannerIcon}
-        />
-        <View style={styles.bannerTextContainer}>
-          <Text style={styles.bannerTitle}>
-            Verification adds an extra layer of...
-          </Text>
-          <Text style={styles.bannerSubtitle}>Verify your account now!</Text>
-        </View>
-        <Feather name="chevron-right" size={24} color={COLORS.textSecondary} />
-      </TouchableOpacity>
-
-      {/* --- Phần Tabs (Plans / Safety) --- */}
-      <View style={styles.tabContainer}>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === "Plans" && styles.activeTab]}
-          onPress={() => setActiveTab("Plans")}
-        >
-          <Text
-            style={[
-              styles.tabText,
-              activeTab === "Plans"
-                ? styles.activeTabText
-                : styles.inactiveTabText,
-            ]}
-          >
-            Plans
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === "Safety" && styles.activeTab]}
-          onPress={() => setActiveTab("Safety")}
-        >
-          <Text
-            style={[
-              styles.tabText,
-              activeTab === "Safety"
-                ? styles.activeTabText
-                : styles.inactiveTabText,
-            ]}
-          >
-            Safety
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* --- Nội dung Tab --- */}
-      {activeTab === "Plans" && (
-        <View>
-          {/* Banner Premium */}
-          <View style={styles.premiumBanner}>
-            <Text style={styles.premiumTitle}>Chilling Date Premium</Text>
-            <Text style={styles.premiumSubtitle}>
-              Unlock exclusive features and supercharge your dating experience.
-            </Text>
-            <TouchableOpacity style={styles.premiumButton}>
-              <Text style={styles.premiumButtonText}>Upgrade from $7.99</Text>
+    <>
+      <Stack.Screen
+        options={{
+          title: "My Profile",
+          headerRight: () => (
+            <TouchableOpacity onPress={handleLogout} style={{ marginRight: 15 }}>
+              <MaterialCommunityIcons
+                name="logout"
+                size={24}
+                color={COLORS.textSecondary}
+              />
             </TouchableOpacity>
-          </View>
-
-          {/* Bảng so sánh */}
-          <View style={styles.tableContainer}>
-            {/* Hàng Header */}
-            <View style={styles.tableRow}>
-              <Text style={[styles.tableHeader, styles.tableCellName]}>
-                Whats included
-              </Text>
-              <Text style={[styles.tableHeader, styles.tableCellCheck]}>
-                Free
-              </Text>
-              <Text style={[styles.tableHeader, styles.tableCellCheck]}>
-                Premium
-              </Text>
-            </View>
-            {/* Hàng Dữ liệu */}
-            {features.map((item, index) => (
-              <View
-                style={[
-                  styles.tableRow,
-                  index === features.length - 1 && styles.lastRow,
-                ]}
-                key={item.name}
-              >
-                <Text style={[styles.tableCell, styles.tableCellName]}>
-                  {item.name}
-                </Text>
-                <View style={[styles.tableCell, styles.tableCellCheck]}>
-                  <Checkbox checked={item.free} />
-                </View>
-                <View style={[styles.tableCell, styles.tableCellCheck]}>
-                  <Checkbox checked={item.premium} />
-                </View>
-              </View>
-            ))}
-          </View>
-        </View>
-      )}
-
-      {activeTab === "Safety" && (
-        <View style={styles.safetyTab}>
-          <Text style={styles.safetyText}>
-            Safety information will be shown here.
+          ),
+        }}
+      />
+      <ScrollView
+        style={styles.container}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+      >
+        <View style={styles.header}>
+          <Image source={{ uri: mainPhoto }} style={styles.profileImage} />
+          <Text style={styles.name}>
+            {user.name}, {getAge(user.dob)}
           </Text>
+          <Text style={styles.location}>
+            {user.location?.city || "Unknown Location"}
+          </Text>
+          <TouchableOpacity
+            style={styles.editButton}
+            onPress={() => router.push("/(main)/(profile)/edit")}
+          >
+            <Feather name="edit-2" size={16} color={COLORS.primary} />
+            <Text style={styles.editButtonText}>Edit Profile</Text>
+          </TouchableOpacity>
         </View>
-      )}
-    </ScrollView>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>About Me</Text>
+          <Text style={styles.bio}>{user.bio || "No bio yet."}</Text>
+        </View>
+
+        {user.interests?.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Interests</Text>
+            <View style={styles.pillContainer}>
+              {user.interests.map((interest) => (
+                <Pill key={interest} label={interest} />
+              ))}
+            </View>
+          </View>
+        )}
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>My Details</Text>
+          {user.occupation && (
+            <ProfileInfo
+              icon={
+                <Ionicons
+                  name="briefcase-outline"
+                  size={20}
+                  color={COLORS.textSecondary}
+                />
+              }
+              label="Occupation"
+              value={user.occupation}
+            />
+          )}
+          {user.education && (
+            <ProfileInfo
+              icon={
+                <Ionicons
+                  name="school-outline"
+                  size={20}
+                  color={COLORS.textSecondary}
+                />
+              }
+              label="Education"
+              value={user.education}
+            />
+          )}
+          {user.pronouns && (
+            <ProfileInfo
+              icon={
+                <AntDesign
+                  name="user"
+                  size={20}
+                  color={COLORS.textSecondary}
+                />
+              }
+              label="Pronouns"
+              value={user.pronouns}
+            />
+          )}
+          {user.height && (
+            <ProfileInfo
+              icon={
+                <MaterialCommunityIcons
+                  name="ruler"
+                  size={20}
+                  color={COLORS.textSecondary}
+                />
+              }
+              label="Height"
+              value={`${user.height} cm`}
+            />
+          )}
+          {user.zodiac && (
+            <ProfileInfo
+              icon={
+                <MaterialCommunityIcons
+                  name="zodiac-aquarius"
+                  size={20}
+                  color={COLORS.textSecondary}
+                />
+              }
+              label="Zodiac"
+              value={user.zodiac}
+            />
+          )}
+        </View>
+
+        {user.languages?.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>I Communicate In</Text>
+            <View style={styles.pillContainer}>
+              {user.languages.map((lang) => (
+                <Pill key={lang} label={lang} />
+              ))}
+            </View>
+          </View>
+        )}
+      </ScrollView>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
+  centered: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: COLORS.white,
+  },
   container: {
     flex: 1,
     backgroundColor: COLORS.white,
-    paddingHorizontal: 20,
   },
-  // --- Profile Header ---
-  profileHeader: {
+  header: {
     alignItems: "center",
-    marginTop: 20,
+    padding: 20,
+    backgroundColor: COLORS.lightGray,
+    paddingBottom: 30,
   },
-  avatarContainer: {
-    position: "relative",
+  profileImage: {
     width: 120,
     height: 120,
-  },
-  avatar: {
-    width: "100%",
-    height: "100%",
     borderRadius: 60,
-    borderWidth: 5,
-    borderColor: COLORS.primaryLight, // Vòng tròn bên ngoài
+    borderWidth: 3,
+    borderColor: COLORS.primary,
+    marginBottom: 15,
   },
-  progressBadge: {
-    position: "absolute",
-    bottom: 5,
-    alignSelf: "center",
-    backgroundColor: COLORS.primary,
-    borderRadius: 15,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  progressText: {
-    color: COLORS.white,
-    fontSize: 10,
-    fontWeight: "bold",
-  },
-  profileName: {
+  name: {
     fontSize: 24,
-    fontWeight: "700",
-    color: COLORS.text,
-    marginTop: 15,
-    alignItems: "center",
-  },
-  editProfileLink: {
-    fontSize: 16,
-    color: COLORS.primary,
-    marginTop: 5,
-    fontWeight: "600",
-  },
-  // --- Verification Banner ---
-  verificationBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: COLORS.secondary, // Màu hồng nhạt
-    borderRadius: 12,
-    padding: 16,
-    marginTop: 25,
-  },
-  bannerIcon: {
-    marginRight: 12,
-  },
-  bannerTextContainer: {
-    flex: 1,
-  },
-  bannerTitle: {
-    fontSize: 14,
-    fontWeight: "600",
+    fontWeight: "bold",
     color: COLORS.text,
   },
-  bannerSubtitle: {
-    fontSize: 14,
-    color: COLORS.primary,
-    fontWeight: "700",
-  },
-  // --- Tabs ---
-  tabContainer: {
-    flexDirection: "row",
-    marginTop: 30,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.gray,
-  },
-  tab: {
-    flex: 1,
-    alignItems: "center",
-    paddingBottom: 12,
-  },
-  activeTab: {
-    borderBottomWidth: 3,
-    borderBottomColor: COLORS.primary,
-  },
-  tabText: {
+  location: {
     fontSize: 16,
-    fontWeight: "600",
-  },
-  activeTabText: {
-    color: COLORS.primary,
-  },
-  inactiveTabText: {
     color: COLORS.textSecondary,
+    marginTop: 4,
   },
-  // --- Premium Banner ---
-  premiumBanner: {
-    backgroundColor: COLORS.primaryLight, // Màu đỏ đô nhạt
-    borderRadius: 16,
+  editButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 20,
+    backgroundColor: COLORS.secondary,
+    paddingVertical: 8,
+    paddingHorizontal: 20,
+    borderRadius: 20,
+  },
+  editButtonText: {
+    color: COLORS.primary,
+    fontWeight: "bold",
+    marginLeft: 8,
+  },
+  section: {
     padding: 20,
-    alignItems: "center",
-    marginTop: 30,
-  },
-  premiumTitle: {
-    fontSize: 22,
-    fontWeight: "700",
-    color: COLORS.white,
-  },
-  premiumSubtitle: {
-    fontSize: 14,
-    color: COLORS.white,
-    textAlign: "center",
-    marginTop: 8,
-    opacity: 0.9,
-  },
-  premiumButton: {
-    backgroundColor: COLORS.primary, // Màu đỏ đô
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 25,
-    marginTop: 16,
-  },
-  premiumButtonText: {
-    color: COLORS.white,
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  // --- Feature Table ---
-  tableContainer: {
-    marginTop: 30,
-    borderWidth: 1,
-    borderColor: COLORS.gray,
-    borderRadius: 12,
-  },
-  tableRow: {
-    flexDirection: "row",
     borderBottomWidth: 1,
     borderBottomColor: COLORS.gray,
-    alignItems: "center",
   },
-  lastRow: {
-    borderBottomWidth: 0,
-  },
-  tableHeader: {
-    fontWeight: "700",
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
     color: COLORS.text,
-    padding: 12,
-    fontSize: 14,
+    marginBottom: 15,
   },
-  tableCell: {
-    padding: 12,
-  },
-  tableCellName: {
-    flex: 2,
-    color: COLORS.textSecondary,
-    fontWeight: "500",
-  },
-  tableCellCheck: {
-    flex: 0.7,
-    alignItems: "center",
-  },
-  // --- Safety Tab ---
-  safetyTab: {
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: 40,
-  },
-  safetyText: {
+  bio: {
     fontSize: 16,
     color: COLORS.textSecondary,
+    lineHeight: 24,
+  },
+  infoRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 15,
+  },
+  infoLabel: {
+    fontSize: 16,
+    color: COLORS.text,
+    marginLeft: 15,
+  },
+  infoValue: {
+    fontSize: 16,
+    color: COLORS.textSecondary,
+    marginLeft: "auto",
+  },
+  pillContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+  },
+  pill: {
+    backgroundColor: COLORS.secondary,
+    borderRadius: 20,
+    paddingVertical: 8,
+    paddingHorizontal: 15,
+    marginRight: 10,
+    marginBottom: 10,
+  },
+  pillText: {
+    color: COLORS.primary,
+    fontWeight: "600",
+    fontSize: 14,
   },
 });
