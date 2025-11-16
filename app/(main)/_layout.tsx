@@ -23,6 +23,9 @@ export default function MainLayout() {
         },
         tabBarActiveTintColor: COLORS.primary,
         tabBarInactiveTintColor: COLORS.textSecondary,
+        // CRITICAL: Prevent tabs from unmounting when switching
+        lazy: true, // Changed to true
+        unmountOnBlur: false, // Don't unmount when tab loses focus
       }}
     >
       {/* Discover */}

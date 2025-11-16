@@ -1,4 +1,4 @@
-// app/(main)/discover/_layout.tsx
+// app/(main)/(discover)/_layout.tsx
 
 import { Feather, Ionicons } from "@expo/vector-icons";
 import { Stack, router } from "expo-router";
@@ -22,7 +22,13 @@ const HeaderProgressBar = () => (
 
 export default function DiscoverStackLayout() {
   return (
-    <Stack>
+    <Stack
+      screenOptions={{
+        // CRITICAL: Prevent screen from unmounting when navigating
+        animation: "none", // Tắt animation để tránh remount
+        gestureEnabled: false, // Disable swipe back gesture
+      }}
+    >
       <Stack.Screen
         name="index"
         options={{
@@ -61,7 +67,7 @@ export default function DiscoverStackLayout() {
             </View>
           ),
           headerRight: () => (
-            <TouchableOpacity onPress={() => router.push("filters")}>
+            <TouchableOpacity onPress={() => router.push("/(main)/(discover)/filters")}>
               <Ionicons
                 name="options-outline"
                 size={26}
@@ -79,7 +85,9 @@ export default function DiscoverStackLayout() {
       <Stack.Screen
         name="[id]"
         options={{
-          headerShown: true, // Hiển thị header (sẽ dùng chung header của Stack)
+          headerShown: true,
+          // Prevent remount when navigating to detail
+          animation: "slide_from_right",
         }}
       />
       {/* ------------------------------------------- */}
@@ -105,8 +113,8 @@ const styles = StyleSheet.create({
   },
   progressBar: {
     height: "100%",
-    width: "40%", // Giả lập 40%
-    backgroundColor: COLORS.primary, // Màu đỏ đô
+    width: "40%",
+    backgroundColor: COLORS.primary,
     borderRadius: 2,
   },
 });
