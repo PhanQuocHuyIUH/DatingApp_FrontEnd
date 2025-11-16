@@ -1,27 +1,24 @@
+import {
+  AntDesign,
+  Feather,
+  Ionicons,
+  MaterialCommunityIcons,
+} from "@expo/vector-icons";
+import { Stack, useFocusEffect, useRouter } from "expo-router";
 import React, { useCallback, useState } from "react";
 import {
-  ScrollView,
-  View,
-  Text,
-  StyleSheet,
-  Image,
-  TouchableOpacity,
   ActivityIndicator,
-  RefreshControl,
   Alert,
+  Image,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
-import { Stack, useRouter, useFocusEffect } from "expo-router";
-import {
-  Feather,
-  MaterialCommunityIcons,
-  Ionicons,
-  FontAwesome5,
-  Entypo,
-  SimpleLineIcons,
-  AntDesign,
-} from "@expo/vector-icons";
-import { userService } from "../../../services/userService";
 import { authService } from "../../../services/authService";
+import { userService } from "../../../services/userService";
 
 const COLORS = {
   primary: "#b21e46",
@@ -34,7 +31,12 @@ const COLORS = {
   lightGray: "#F3F4F6",
 };
 
-const ProfileInfo = ({ icon, label, value }) => (
+type ProfileInfoProps = {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+};
+const ProfileInfo: React.FC<ProfileInfoProps> = ({ icon, label, value }) => (
   <View style={styles.infoRow}>
     {icon}
     <Text style={styles.infoLabel}>{label}</Text>
@@ -42,23 +44,46 @@ const ProfileInfo = ({ icon, label, value }) => (
   </View>
 );
 
-const Pill = ({ label }) => (
+type PillProps = {
+  label: string;
+};
+const Pill: React.FC<PillProps> = ({ label }) => (
   <View style={styles.pill}>
     <Text style={styles.pillText}>{label}</Text>
   </View>
 );
 
+type UserProfile = {
+  name: string;
+  dob: string;
+  location?: { city?: string };
+  bio?: string;
+  interests?: string[];
+  occupation?: string;
+  education?: string;
+  pronouns?: string;
+  height?: number;
+  zodiac?: string;
+  languages?: string[];
+  photos?: { url: string; isMain?: boolean }[];
+};
+
 export default function ProfileScreen() {
   const router = useRouter();
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   const fetchProfile = async () => {
     try {
       const response = await userService.getMyProfile();
-      if (response.success) {
-        setUser(response.data.user);
+      type UserProfileResponse = {
+        success: boolean;
+        data: { user: UserProfile };
+      };
+      const typedResponse = response as UserProfileResponse;
+      if (typedResponse.success) {
+        setUser(typedResponse.data.user);
       } else {
         Alert.alert("Error", "Failed to fetch profile.");
       }
@@ -88,7 +113,7 @@ export default function ProfileScreen() {
     router.replace("/(auth)/login");
   };
 
-  const getAge = (dob) => {
+  const getAge = (dob: string) => {
     if (!dob) return "";
     const birthDate = new Date(dob);
     const today = new Date();
@@ -132,7 +157,10 @@ export default function ProfileScreen() {
         options={{
           title: "My Profile",
           headerRight: () => (
-            <TouchableOpacity onPress={handleLogout} style={{ marginRight: 15 }}>
+            <TouchableOpacity
+              onPress={handleLogout}
+              style={{ marginRight: 15 }}
+            >
               <MaterialCommunityIcons
                 name="logout"
                 size={24}
@@ -170,11 +198,11 @@ export default function ProfileScreen() {
           <Text style={styles.bio}>{user.bio || "No bio yet."}</Text>
         </View>
 
-        {user.interests?.length > 0 && (
+        {user.interests && user.interests.length > 0 && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Interests</Text>
             <View style={styles.pillContainer}>
-              {user.interests.map((interest) => (
+              {(user.interests ?? []).map((interest) => (
                 <Pill key={interest} label={interest} />
               ))}
             </View>
@@ -212,11 +240,7 @@ export default function ProfileScreen() {
           {user.pronouns && (
             <ProfileInfo
               icon={
-                <AntDesign
-                  name="user"
-                  size={20}
-                  color={COLORS.textSecondary}
-                />
+                <AntDesign name="user" size={20} color={COLORS.textSecondary} />
               }
               label="Pronouns"
               value={user.pronouns}
@@ -250,11 +274,11 @@ export default function ProfileScreen() {
           )}
         </View>
 
-        {user.languages?.length > 0 && (
+        {user.languages && user.languages.length > 0 && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>I Communicate In</Text>
             <View style={styles.pillContainer}>
-              {user.languages.map((lang) => (
+              {(user.languages ?? []).map((lang) => (
                 <Pill key={lang} label={lang} />
               ))}
             </View>
