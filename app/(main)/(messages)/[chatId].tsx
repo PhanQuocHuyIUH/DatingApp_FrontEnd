@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ScrollView,
   View,
@@ -7,8 +7,8 @@ import {
   Image,
   TouchableOpacity,
   TextInput,
-  KeyboardAvoidingView,
   Platform,
+  KeyboardAvoidingView,
 } from "react-native";
 import { Stack, useLocalSearchParams, router } from "expo-router";
 import {
@@ -19,6 +19,10 @@ import {
 } from "@expo/vector-icons";
 import { StatusBar } from "expo-status-bar";
 import { chatService } from "../../../services/chatService";
+import { socketService } from "../../../services/socketService";
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderHeight } from '@react-navigation/elements';
 
 // --- Bảng màu ---
 const COLORS = {
@@ -53,12 +57,27 @@ const MyMessageBubble = ({ text, time }: { text: string; time: string }) => (
   </View>
 );
 
+const TheirMessageBubble = ({ text, time }: { text: string; time: string }) => (
+  <View style={styles.theirMessageContainer}>
+    <View style={styles.theirMessageBubble}>
+      <Text style={styles.theirMessageText}>{text}</Text>
+    </View>
+    <Text style={styles.messageTime}>{time}</Text>
+  </View>
+);
+
 // --- Màn hình chính ---
 export default function ChatScreen() {
-  const { chatId, matchId, userName, userAge, avatar } = useLocalSearchParams<{ chatId: string; matchId?: string; userName?: string; userAge?: string; avatar?: string }>();
+  const { chatId, matchId, userName, userAge, avatar, userId } = useLocalSearchParams<{ chatId: string; matchId?: string; userName?: string; userAge?: string; avatar?: string; userId?: string }>();
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(true);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [typing, setTyping] = useState(false);
+  const scrollRef = useRef<ScrollView>(null);
+  const insets = useSafeAreaInsets();
+  const [inputHeight, setInputHeight] = useState(0);
+  const headerHeight = useHeaderHeight();
 
   const headerUser = useMemo(() => ({
     id: "",
@@ -76,7 +95,7 @@ export default function ChatScreen() {
       const res = await chatService.getMessages(String(chatId), { limit: 50 });
       const list = res?.data?.messages || [];
       setMessages(list);
-    } catch (e) {
+    } catch {
       // ignore for now
     } finally {
       setLoading(false);
@@ -87,16 +106,92 @@ export default function ChatScreen() {
     loadMessages();
   }, [loadMessages]);
 
+  // No manual keyboard listeners needed with KeyboardStickyView
+
+  // Init socket & listeners
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const userStr = await AsyncStorage.getItem('user');
+        if (userStr) {
+          const u = JSON.parse(userStr);
+          const uid = u?.id || u?._id || null;
+          if (mounted) setCurrentUserId(uid);
+          console.log('👤 Current user ID:', uid);
+        }
+        const sock = await socketService.init();
+        console.log('🔌 Socket connected:', sock?.connected);
+        
+        if (chatId) {
+          console.log('🚪 Joining conversation:', chatId);
+          socketService.joinConversation(chatId);
+        }
+        
+        socketService.onNewMessage((payload:any) => {
+          console.log('📨 Message received in chat screen:', payload);
+          const convId = payload?.conversationId?.toString();
+          const currentChatId = chatId?.toString();
+          console.log('Comparing:', convId, 'vs', currentChatId);
+          
+          if (convId !== currentChatId) {
+            console.log('❌ Wrong conversation, ignoring');
+            return;
+          }
+          
+          const msg = payload.message;
+          if (!msg) {
+            console.log('❌ No message in payload');
+            return;
+          }
+          
+          console.log('✅ Adding message to UI:', msg);
+          // Avoid duplicate (check if already exists)
+          if (!mounted) return;
+          setMessages(prev => {
+            const exists = prev.find(m => (m._id || m.id) === (msg._id || msg.id));
+            if (exists) {
+              console.log('⚠️ Duplicate message, skipping');
+              return prev;
+            }
+            return [...prev, msg];
+          });
+          // auto scroll
+          requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: true }));
+          // Auto read receipt if message from other user
+          if (msg.sender && msg.sender._id !== currentUserId) {
+            socketService.emitRead({ messageId: msg._id, conversationId: chatId, senderId: msg.sender._id });
+          }
+        });
+        
+        socketService.onTyping((data:any) => {
+          if (data?.conversationId === chatId && data?.userId === userId) {
+            if (mounted) setTyping(data.isTyping);
+          }
+        });
+      } catch (err) {
+        console.error('❌ Socket setup error:', err);
+      }
+    })();
+    return () => {
+      mounted = false;
+      if (chatId) {
+        console.log('👋 Leaving conversation:', chatId);
+        socketService.leaveConversation(chatId);
+      }
+    };
+  }, [chatId, userId, currentUserId]);
+
   // Hàm này sẽ điều hướng đến trang video call
   const onVideoCallPress = () => {
-   router.push("video-call");
+    router.push('/(main)/(messages)/video-call');
   };
 
   return (
     <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
       style={styles.container}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0} // Tinh chỉnh offset
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? headerHeight + 10 : 0}
     >
       <StatusBar style="dark" />
 
@@ -129,17 +224,11 @@ export default function ChatScreen() {
                   )}
                 </View>
               </View>
-              {/* Nút xem profile */}
-              <TouchableOpacity 
-                style={styles.profileButton}
-                onPress={() => router.push(`/discover/${headerUser.id}`)}
-              >
-                <Feather name="chevron-right" size={24} color={COLORS.white} />
-              </TouchableOpacity>
+              {/* Profile quick view removed per request */}
             </View>
           ),
           headerTitleAlign: "left",
-          headerTitleStyle: { flex: 1 },
+          // headerTitleStyle removed unsupported flex prop
           // Header Right (Video, More)
           headerRight: () => (
             <View style={styles.headerRightContainer}>
@@ -155,38 +244,44 @@ export default function ChatScreen() {
       />
 
       {/* --- 1. Nội dung Chat --- */}
-      <ScrollView style={styles.chatContainer} contentContainerStyle={{ paddingVertical: 16 }}>
+      <ScrollView
+        ref={scrollRef}
+        style={styles.chatContainer}
+        contentContainerStyle={{ paddingTop: 16, paddingBottom: 16 + inputHeight }}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+        automaticallyAdjustKeyboardInsets={true}
+      >
         {loading ? (
           <Text style={styles.dateSeparator}>Loading...</Text>
         ) : messages.length === 0 ? (
           <Text style={styles.dateSeparator}>Say hi 👋</Text>
         ) : (
-          messages.map((m, idx) => (
-            <MyMessageBubble key={(m._id || m.id || idx).toString()} text={m.text || ''} time={new Date(m.createdAt || Date.now()).toLocaleTimeString()} />
-          ))
+          messages.map((m, idx) => {
+            const isMine = (m.sender?._id || m.sender?.id) === currentUserId;
+            const time = new Date(m.createdAt || Date.now()).toLocaleTimeString();
+            // Use unique key: combine _id/id with index to prevent duplicates
+            const uniqueKey = `${m._id || m.id || 'temp'}-${idx}`;
+            return isMine ? (
+              <MyMessageBubble key={uniqueKey} text={m.text || ''} time={time} />
+            ) : (
+              <TheirMessageBubble key={uniqueKey} text={m.text || ''} time={time} />
+            );
+          })
         )}
       </ScrollView>
+      {!!typing && <Text style={styles.typingIndicator}>{headerUser.name} is typing...</Text>}
 
-      {/* --- 2. Banner Mini-game --- */}
-      <View style={styles.banner}>
-        <Ionicons
-          name="game-controller-outline"
-          size={20}
-          color={COLORS.primary}
-          style={{ marginRight: 10 }}
-        />
-        <View style={{ flex: 1 }}>
-          <Text style={styles.bannerTitle}>
-            Invite your match to play a mini-game.
-          </Text>
-          <Text style={styles.bannerSubtitle}>
-            Break the ice and find out if you both sync on a deeper level.
-          </Text>
-        </View>
-      </View>
+      {/* Mini-game banner removed */}
 
       {/* --- 3. Ô nhập tin nhắn --- */}
-      <View style={styles.inputContainer}>
+      <View
+        onLayout={(e) => setInputHeight(e.nativeEvent.layout.height)}
+        style={[
+          styles.inputContainer,
+          { paddingBottom: Platform.OS === 'ios' ? 12 + insets.bottom : 12 },
+        ]}
+      >
         {/* Hàng 1: Text Input */}
         <View style={styles.textInputRow}>
           <TextInput
@@ -194,7 +289,12 @@ export default function ChatScreen() {
             placeholder="Type a message..."
             placeholderTextColor={COLORS.textSecondary}
             value={message}
-            onChangeText={setMessage}
+            onChangeText={(t) => {
+              setMessage(t);
+              if (chatId && userId) {
+                socketService.debounceTyping({ conversationId: String(chatId), receiverId: String(userId) });
+              }
+            }}
             multiline
           />
           <TouchableOpacity style={styles.emojiButton}>
@@ -228,15 +328,19 @@ export default function ChatScreen() {
             style={styles.sendButton}
             onPress={async () => {
               if (!message.trim() || !matchId) return;
+              const textToSend = message.trim();
+              const optimistic: ChatMessage = { _id: `optimistic-${Date.now()}`, sender: { _id: currentUserId }, text: textToSend, createdAt: new Date().toISOString() };
+              setMessages(prev => [...prev, optimistic]);
+              requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: true }));
+              setMessage('');
               try {
-                const res = await chatService.sendMessage(String(matchId), { type: 'text', text: message.trim() });
+                const res = await chatService.sendMessage(String(matchId), { type: 'text', text: textToSend });
                 const sent = res?.data?.message || res?.message;
                 if (sent) {
-                  setMessages((prev) => [...prev, sent]);
-                  setMessage('');
+                  setMessages(prev => prev.map(m => m._id === optimistic._id ? sent : m));
                 }
-              } catch (e) {
-                // optional: show toast
+              } catch {
+                setMessages(prev => prev.filter(m => m._id !== optimistic._id));
               }
             }}
           >
@@ -283,15 +387,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: COLORS.textSecondary,
   },
-  profileButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: COLORS.primary, // Đổi màu
-    justifyContent: "center",
-    alignItems: "center",
-    marginLeft: 10,
-  },
   headerRightContainer: {
     flexDirection: "row",
     alignItems: "center",
@@ -312,6 +407,10 @@ const styles = StyleSheet.create({
     alignItems: "flex-end",
     marginBottom: 10,
   },
+  theirMessageContainer: {
+    alignItems: 'flex-start',
+    marginBottom: 10,
+  },
   myMessageBubble: {
     backgroundColor: COLORS.primary, // Đổi màu
     paddingHorizontal: 16,
@@ -320,8 +419,20 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 4, // Góc bo
     maxWidth: "80%",
   },
+  theirMessageBubble: {
+    backgroundColor: COLORS.lightGray,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 20,
+    borderBottomLeftRadius: 4,
+    maxWidth: '80%',
+  },
   myMessageText: {
     color: COLORS.white,
+    fontSize: 16,
+  },
+  theirMessageText: {
+    color: COLORS.text,
     fontSize: 16,
   },
   messageTime: {
@@ -329,26 +440,14 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     marginTop: 4,
   },
-  // --- Banner Styles ---
-  banner: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: COLORS.secondary, // Đổi màu
-    padding: 16,
-    marginHorizontal: 16,
-    borderRadius: 12,
-    marginBottom: 8,
-  },
-  bannerTitle: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: COLORS.primary, // Đổi màu
-  },
-  bannerSubtitle: {
-    fontSize: 12,
+  typingIndicator: {
+    textAlign: 'left',
+    marginLeft: 16,
     color: COLORS.textSecondary,
-    marginTop: 2,
+    fontSize: 12,
+    marginBottom: 4,
   },
+  // --- Banner Styles Removed ---
   // --- Input Styles ---
   inputContainer: {
     backgroundColor: COLORS.white,

@@ -139,9 +139,10 @@ export default function MatchDetailScreen() {
 					userAge: other.age,
 					avatar: (other.photos?.find?.((ph:any)=>ph.isMain && ph.url)?.url) || (other.photos?.[0]?.url) || undefined,
 				} : {};
+				const otherUser = conv.participants?.find?.((p:any)=> String(p._id) !== String((profile as any)?.id || (profile as any)?._id));
 				router.push({
 					pathname: '/(main)/(messages)/[chatId]',
-					params: { chatId: String(conv.id), matchId: String(match.id), ...header },
+					params: { chatId: String(conv.id), matchId: String(match.id), userId: otherUser?._id || '', ...header },
 				});
 			} else {
 				Alert.alert('Error', 'Failed to open conversation');

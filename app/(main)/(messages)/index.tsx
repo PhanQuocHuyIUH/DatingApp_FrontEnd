@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { Link } from "expo-router";
 import { chatService } from "../../../services/chatService";
+import { socketService } from "../../../services/socketService";
 import { Ionicons } from "@expo/vector-icons";
 
 // --- Bảng màu ---
@@ -42,7 +43,8 @@ type Conversation = {
 
 // --- Component cho Avatar (Matches) ---
 // Placeholder for matches carousel (optional)
-const MatchAvatar = ({ item }: { item: any }) => null;
+// (Reserved) Match avatar carousel not used currently; keep placeholder minimal.
+// const MatchAvatar = ({ item }: { item: any }) => null;
 
 // --- Component cho Hàng Chat ---
 const ChatRow = ({ item }: { item: Conversation }) => {
@@ -59,6 +61,7 @@ const ChatRow = ({ item }: { item: Conversation }) => {
           userName: item.user.name,
           userAge: item.user.age?.toString() || '',
           avatar: avatar || '',
+          userId: item.user.id,
         },
       }}
       asChild
@@ -104,11 +107,33 @@ export default function MessagesScreen() {
     load();
   }, [load]);
 
+  // Realtime updates for new messages
+  useEffect(() => {
+    (async () => {
+      try {
+        await socketService.init();
+        socketService.onNewMessage((payload: any) => {
+          const { conversationId, message } = payload || {};
+          if (!conversationId || !message) return;
+          setConvs(prev => {
+            const existing = prev.find(c => c.id === conversationId);
+            const updated = existing ? prev.map(c => c.id === conversationId ? { ...c, lastMessage: { text: message.text, timestamp: message.createdAt }, unreadCount: (c.unreadCount || 0) + 1 } : c) : [{ id: conversationId, matchId: '', user: { id: message.sender?._id, name: message.sender?.name || 'New', photos: message.sender?.photos }, lastMessage: { text: message.text, timestamp: message.createdAt }, unreadCount: 1 }, ...prev];
+            // reorder by lastMessage timestamp desc
+            return [...updated].sort((a,b) => new Date(b.lastMessage?.timestamp || 0).getTime() - new Date(a.lastMessage?.timestamp || 0).getTime());
+          });
+        });
+      } catch {
+        // ignore socket connect errors
+      }
+    })();
+  }, []);
+
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
       <View style={styles.section}>
         <View style={styles.chatHeader}>
           <Text style={styles.sectionTitle}>Chats ({convs.length})</Text>
+          {/* Auto realtime updates via socket; manual refresh optional */}
           <TouchableOpacity onPress={load}>
             <Ionicons name="refresh" size={24} color={COLORS.textSecondary} />
           </TouchableOpacity>

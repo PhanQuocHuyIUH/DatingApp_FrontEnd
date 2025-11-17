@@ -2,8 +2,14 @@ import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { StyleSheet } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
+import React, { useEffect } from 'react';
+import { socketService } from "../services/socketService";
 
 export default function RootLayout() {
+  useEffect(() => {
+    // Initialize socket once for the app lifecycle
+    socketService.init().catch(() => {});
+  }, []);
   return (
     <SafeAreaProvider>
       {/* SafeAreaView giúp đảm bảo mọi thứ không bị che bởi notch / status bar */}
