@@ -57,6 +57,17 @@ export const discoveryService = {
             throw error.response?.data || { message: 'Network error' };
         }
     },
+    /**
+     * Get profiles I have liked (including superlikes), not necessarily matched.
+     * GET /discovery/getLikeSwiped
+     */
+    getLikedSwiped: async (limit = 50) => {
+        try {
+            const response = await api.get('/discovery/getLikeSwiped', { params: { limit } });
+            return response.data; // { success, count, data: { profiles } }
+        } catch (error) {
+            throw error.response?.data || { message: 'Network error' };
+        }
+    },
 
-    
 };
