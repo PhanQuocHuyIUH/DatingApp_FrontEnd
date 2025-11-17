@@ -45,7 +45,7 @@ export default function MainLayout() {
 
       {/* Matches */}
       <Tabs.Screen
-        name="(matches)/index"
+        name="(matches)"  
         options={{
           title: "Matches",
           tabBarIcon: ({ color, size, focused }) => (
