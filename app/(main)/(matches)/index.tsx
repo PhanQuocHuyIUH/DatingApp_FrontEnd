@@ -6,6 +6,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { matchService } from '../../../services/matchService';
 import { discoveryService } from '../../../services/discoveryService';
 import { useRouter } from 'expo-router';
+import { chatService } from '../../../services/chatService';
 
 const COLORS = {
   primary: '#b21e46',
@@ -170,6 +171,17 @@ export default function MatchesScreen() {
       const d = new Date(item.matchedAt).getTime();
       return Date.now() - d < 24 * 60 * 60 * 1000;
     })();
+    const onChat = async () => {
+      try {
+        const res = await chatService.createConversation(item.id);
+        const conv = res?.data?.conversation || res?.conversation || res?.data;
+        if (conv?.id) {
+          router.push({ pathname: '/(main)/(messages)/[chatId]', params: { chatId: String(conv.id), matchId: String(item.id) } });
+        }
+      } catch {
+        // noop; could show toast
+      }
+    };
     return (
       <View style={styles.card}>
         <Image source={{ uri: img }} style={styles.avatar} />
@@ -186,7 +198,7 @@ export default function MatchesScreen() {
               <MaterialIcons name="person" size={18} color="#fff" />
               <Text style={styles.btnPrimaryText}>View</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.btn, styles.btnOutline]} onPress={() => { /* Placeholder chat */ }}>
+            <TouchableOpacity style={[styles.btn, styles.btnOutline]} onPress={onChat}>
               <MaterialIcons name="chat" size={18} color={COLORS.primary} />
               <Text style={styles.btnOutlineText}>Chat</Text>
             </TouchableOpacity>

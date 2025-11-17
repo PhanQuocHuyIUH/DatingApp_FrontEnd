@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import {
   ScrollView,
   View,
@@ -9,6 +9,7 @@ import {
   FlatList,
 } from "react-native";
 import { Link } from "expo-router";
+import { chatService } from "../../../services/chatService";
 import { Ionicons } from "@expo/vector-icons";
 
 // --- Bảng màu ---
@@ -24,102 +25,56 @@ const COLORS = {
   away: "#F59E0B", // Vàng
 };
 
-// --- Dữ liệu giả ---
-const matches = [
-  {
-    id: "1",
-    name: "Maria",
-    avatar: "https://randomuser.me/api/portraits/women/65.jpg",
-    status: "online",
-  },
-  {
-    id: "2",
-    name: "Anna",
-    avatar: "https://randomuser.me/api/portraits/women/44.jpg",
-    status: "offline",
-  },
-  {
-    id: "3",
-    name: "Jennifer",
-    avatar: "https://randomuser.me/api/portraits/women/32.jpg",
-    status: "away",
-  },
-  {
-    id: "4",
-    name: "Charlie",
-    avatar: "https://randomuser.me/api/portraits/women/12.jpg",
-    status: "online",
-  },
-  {
-    id: "5",
-    name: "Sarah",
-    avatar: "https://randomuser.me/api/portraits/women/17.jpg",
-    status: "offline",
-  },
-];
-
-const chats = [
-  {
-    id: "ava-jones", // Sẽ dùng cho dynamic route
-    name: "Ava Jones",
-    avatar:
-      "https://images.unsplash.com/photo-1580489944761-15a19d654956?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%D&auto=format&fit=crop&w=761&q=80",
-    lastMessage: "You: Hello!",
-    time: "1 hours ago",
-    status: "online",
-  },
-  // Thêm các chat khác ở đây nếu muốn
-];
-
-// --- Component cho Avatar (Matches) ---
-const MatchAvatar = ({ item }: { item: (typeof matches)[0] }) => {
-  const statusColor =
-    item.status === "online"
-      ? COLORS.online
-      : item.status === "away"
-      ? COLORS.away
-      : COLORS.offline;
-
-  return (
-    <TouchableOpacity style={styles.matchItem}>
-      <Image source={{ uri: item.avatar }} style={styles.matchAvatar} />
-      <View style={[styles.statusIndicator, { backgroundColor: statusColor }]} />
-      <Text style={styles.matchName}>{item.name}</Text>
-    </TouchableOpacity>
-  );
+type Conversation = {
+  id: string;
+  matchId: string;
+  user: {
+    id: string;
+    name: string;
+    age?: number;
+    photos?: { url?: string; isMain?: boolean }[];
+    lastActive?: string;
+    isOnline?: boolean;
+  };
+  lastMessage?: { text?: string; timestamp?: string };
+  unreadCount?: number;
 };
 
-// --- Component cho Hàng Chat ---
-const ChatRow = ({ item }: { item: (typeof chats)[0] }) => {
-  const statusColor =
-    item.status === "online"
-      ? COLORS.online
-      : item.status === "away"
-      ? COLORS.away
-      : COLORS.offline;
+// --- Component cho Avatar (Matches) ---
+// Placeholder for matches carousel (optional)
+const MatchAvatar = ({ item }: { item: any }) => null;
 
+// --- Component cho Hàng Chat ---
+const ChatRow = ({ item }: { item: Conversation }) => {
+  const avatar = (item.user.photos?.find(p => p.isMain && p.url)?.url) || item.user.photos?.[0]?.url;
+  const statusColor = item.user.isOnline ? COLORS.online : COLORS.offline;
+  const lastText = item.lastMessage?.text || '';
   return (
-    <Link href={item.id} asChild>
+    <Link
+      href={{
+        pathname: '/(main)/(messages)/[chatId]',
+        params: {
+          chatId: item.id,
+          matchId: item.matchId,
+          userName: item.user.name,
+          userAge: item.user.age?.toString() || '',
+          avatar: avatar || '',
+        },
+      }}
+      asChild
+    >
       <TouchableOpacity style={styles.chatRow}>
-        {/* Ảnh và status */}
         <View style={styles.chatAvatarContainer}>
-          <Image source={{ uri: item.avatar }} style={styles.chatAvatar} />
-          <View
-            style={[
-              styles.chatStatusIndicator,
-              { backgroundColor: statusColor },
-            ]}
-          />
+          <Image source={{ uri: avatar }} style={styles.chatAvatar} />
+          <View style={[styles.chatStatusIndicator, { backgroundColor: statusColor }]} />
         </View>
-        {/* Tên và tin nhắn */}
         <View style={styles.chatTextContainer}>
-          <Text style={styles.chatName}>{item.name}</Text>
+          <Text style={styles.chatName}>{item.user.name}{item.user.age ? `, ${item.user.age}` : ''}</Text>
           <Text style={styles.chatLastMessage} numberOfLines={1}>
-            {item.lastMessage}
+            {lastText}
           </Text>
         </View>
-        {/* Thời gian */}
-        <Text style={styles.chatTime}>{item.time}</Text>
+        <Text style={styles.chatTime}></Text>
       </TouchableOpacity>
     </Link>
   );
@@ -127,46 +82,50 @@ const ChatRow = ({ item }: { item: (typeof chats)[0] }) => {
 
 // --- Màn hình chính ---
 export default function MessagesScreen() {
-  return (
-    <ScrollView
-      style={styles.container}
-      showsVerticalScrollIndicator={false}
-      contentContainerStyle={{ paddingBottom: 40 }}
-    >
-      {/* --- 1. Matches --- */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Matches ({matches.length})</Text>
-        <FlatList
-          data={matches}
-          renderItem={({ item }) => <MatchAvatar item={item} />}
-          keyExtractor={(item) => item.id}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingLeft: 20 }}
-        />
-      </View>
+  const [convs, setConvs] = useState<Conversation[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
-      {/* --- 2. Chats --- */}
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const res = await chatService.getConversations();
+      const list = res?.data?.conversations || [];
+      setConvs(list);
+    } catch (e: any) {
+      setError(e?.message || 'Failed to load conversations');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  return (
+    <ScrollView style={styles.container} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
       <View style={styles.section}>
         <View style={styles.chatHeader}>
-          <Text style={styles.sectionTitle}>Chats ({chats.length})</Text>
-          <TouchableOpacity>
-            <Ionicons
-              name="options-outline"
-              size={24}
-              color={COLORS.textSecondary}
-            />
+          <Text style={styles.sectionTitle}>Chats ({convs.length})</Text>
+          <TouchableOpacity onPress={load}>
+            <Ionicons name="refresh" size={24} color={COLORS.textSecondary} />
           </TouchableOpacity>
         </View>
-        
-        {/* Nền hồng nhạt cho chat */}
         <View style={styles.chatListContainer}>
-          <FlatList
-            data={chats}
-            renderItem={({ item }) => <ChatRow item={item} />}
-            keyExtractor={(item) => item.id}
-            scrollEnabled={false} // Tắt cuộn của FlatList này
-          />
+          {loading ? (
+            <Text style={{ padding: 12, color: COLORS.textSecondary }}>Loading...</Text>
+          ) : error ? (
+            <Text style={{ padding: 12, color: 'red' }}>{error}</Text>
+          ) : (
+            <FlatList
+              data={convs}
+              renderItem={({ item }) => <ChatRow item={item} />}
+              keyExtractor={(item) => item.id}
+              scrollEnabled={false}
+            />
+          )}
         </View>
       </View>
     </ScrollView>

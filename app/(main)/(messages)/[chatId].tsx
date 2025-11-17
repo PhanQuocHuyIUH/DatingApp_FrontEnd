@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ScrollView,
   View,
@@ -18,6 +18,7 @@ import {
   MaterialCommunityIcons,
 } from "@expo/vector-icons";
 import { StatusBar } from "expo-status-bar";
+import { chatService } from "../../../services/chatService";
 
 // --- Bảng màu ---
 const COLORS = {
@@ -31,18 +32,15 @@ const COLORS = {
   blueCheck: "#3B82F6",
 };
 
-// --- Dữ liệu giả (dựa trên ID) ---
-const getChatData = (chatId: string) => {
-  // Sau này, bạn sẽ dùng 'chatId' để fetch API
-  return {
-    id: "ava-jones",
-    name: "Ava Jones",
-    age: 25,
-    pronouns: "she/ her/ hers",
-    occupation: "Business Analyst at Tech",
-    avatar:
-      "https://images.unsplash.com/photo-1580489944761-15a19d654956?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%D&auto=format&fit=crop&w=761&q=80",
-  };
+type ChatMessage = {
+  _id?: string;
+  id?: string;
+  sender?: any;
+  receiver?: any;
+  text?: string;
+  type?: string;
+  mediaUrl?: string;
+  createdAt?: string;
 };
 
 // --- Component Tin nhắn (của mình) ---
@@ -57,9 +55,37 @@ const MyMessageBubble = ({ text, time }: { text: string; time: string }) => (
 
 // --- Màn hình chính ---
 export default function ChatScreen() {
-  const { chatId } = useLocalSearchParams<{ chatId: string }>();
-  const user = getChatData(chatId || "");
+  const { chatId, matchId, userName, userAge, avatar } = useLocalSearchParams<{ chatId: string; matchId?: string; userName?: string; userAge?: string; avatar?: string }>();
   const [message, setMessage] = useState("");
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const headerUser = useMemo(() => ({
+    id: "",
+    name: userName || "Chat",
+    age: userAge ? Number(userAge) : undefined,
+    pronouns: "",
+    occupation: "",
+    avatar: avatar || undefined,
+  }), [userName, userAge, avatar]);
+
+  const loadMessages = useCallback(async () => {
+    if (!chatId) return;
+    setLoading(true);
+    try {
+      const res = await chatService.getMessages(String(chatId), { limit: 50 });
+      const list = res?.data?.messages || [];
+      setMessages(list);
+    } catch (e) {
+      // ignore for now
+    } finally {
+      setLoading(false);
+    }
+  }, [chatId]);
+
+  useEffect(() => {
+    loadMessages();
+  }, [loadMessages]);
 
   // Hàm này sẽ điều hướng đến trang video call
   const onVideoCallPress = () => {
@@ -80,10 +106,14 @@ export default function ChatScreen() {
           headerTitle: () => (
             // Header Title tùy chỉnh
             <View style={styles.headerTitleContainer}>
-              <Image source={{ uri: user.avatar }} style={styles.headerAvatar} />
+              {headerUser.avatar ? (
+                <Image source={{ uri: headerUser.avatar }} style={styles.headerAvatar} />
+              ) : (
+                <View style={[styles.headerAvatar, { backgroundColor: COLORS.gray }]} />
+              )}
               <View style={styles.headerTextContainer}>
                 <Text style={styles.headerName}>
-                  {user.name}, {user.age}{" "}
+                  {headerUser.name}{headerUser.age ? `, ${headerUser.age}` : ""}{" "}
                   <MaterialCommunityIcons
                     name="check-circle"
                     size={16}
@@ -91,16 +121,18 @@ export default function ChatScreen() {
                   />
                 </Text>
                 <View style={styles.headerSubtitleRow}>
-                  <Text style={styles.headerSubtitle}>{user.pronouns}</Text>
-                  <Text style={[styles.headerSubtitle, { marginLeft: 8 }]}>
-                    <FontAwesome name="briefcase" size={12} /> {user.occupation}
-                  </Text>
+                  {!!headerUser.pronouns && <Text style={styles.headerSubtitle}>{headerUser.pronouns}</Text>}
+                  {!!headerUser.occupation && (
+                    <Text style={[styles.headerSubtitle, { marginLeft: 8 }]}>
+                      <FontAwesome name="briefcase" size={12} /> {headerUser.occupation}
+                    </Text>
+                  )}
                 </View>
               </View>
               {/* Nút xem profile */}
               <TouchableOpacity 
                 style={styles.profileButton}
-                onPress={() => router.push(`/discover/${user.id}`)}
+                onPress={() => router.push(`/discover/${headerUser.id}`)}
               >
                 <Feather name="chevron-right" size={24} color={COLORS.white} />
               </TouchableOpacity>
@@ -123,14 +155,16 @@ export default function ChatScreen() {
       />
 
       {/* --- 1. Nội dung Chat --- */}
-      <ScrollView
-        style={styles.chatContainer}
-        contentContainerStyle={{ paddingVertical: 16 }}
-      >
-        <Text style={styles.dateSeparator}>Today</Text>
-        <MyMessageBubble text="Hi there!" time="08:42 PM - Sent" />
-
-        {/* Thêm các tin nhắn khác ở đây */}
+      <ScrollView style={styles.chatContainer} contentContainerStyle={{ paddingVertical: 16 }}>
+        {loading ? (
+          <Text style={styles.dateSeparator}>Loading...</Text>
+        ) : messages.length === 0 ? (
+          <Text style={styles.dateSeparator}>Say hi 👋</Text>
+        ) : (
+          messages.map((m, idx) => (
+            <MyMessageBubble key={(m._id || m.id || idx).toString()} text={m.text || ''} time={new Date(m.createdAt || Date.now()).toLocaleTimeString()} />
+          ))
+        )}
       </ScrollView>
 
       {/* --- 2. Banner Mini-game --- */}
@@ -190,7 +224,22 @@ export default function ChatScreen() {
               <Ionicons name="mic-outline" size={24} color={COLORS.primary} />
             </TouchableOpacity>
           </View>
-          <TouchableOpacity style={styles.sendButton}>
+          <TouchableOpacity
+            style={styles.sendButton}
+            onPress={async () => {
+              if (!message.trim() || !matchId) return;
+              try {
+                const res = await chatService.sendMessage(String(matchId), { type: 'text', text: message.trim() });
+                const sent = res?.data?.message || res?.message;
+                if (sent) {
+                  setMessages((prev) => [...prev, sent]);
+                  setMessage('');
+                }
+              } catch (e) {
+                // optional: show toast
+              }
+            }}
+          >
             <Ionicons name="send" size={22} color={COLORS.primary} />
           </TouchableOpacity>
         </View>
