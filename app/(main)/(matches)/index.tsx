@@ -1,23 +1,28 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, FlatList, Image, RefreshControl, ActivityIndicator } from 'react-native';
+import React, { useCallback, useEffect, useState, useRef } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, FlatList, Image, RefreshControl, ActivityIndicator, Animated } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-// import { LinearGradient } from 'expo-linear-gradient';
-import { MaterialIcons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import { MaterialIcons, Ionicons } from '@expo/vector-icons';
 import { matchService } from '../../../services/matchService';
 import { discoveryService } from '../../../services/discoveryService';
 import { useRouter } from 'expo-router';
 import { chatService } from '../../../services/chatService';
 
 const COLORS = {
-  primary: '#b21e46',
-  bg: '#FFFFFF',
-  text: '#1F2937',
-  muted: '#6B7280',
-  border: '#E5E7EB',
-  green: '#27ae60',
-  red: '#e74c3c',
-  blue: '#2980b9',
+  primary: '#FF6B9D',
+  primaryDark: '#C92A6D',
+  bg: '#F7FAFC',
+  text: '#2D3748',
+  muted: '#718096',
+  border: '#E2E8F0',
+  green: '#48BB78',
+  red: '#F56565',
+  blue: '#4299E1',
   chip: '#F3F4F6',
+  gold: '#FFD93D',
+  superLike: '#1E90FF',
+  gradient: ['#FFB4D5', '#FF6B9D'],
+  superGradient: ['#4FC3F7', '#1E88E5'],
 };
 
 type ProfilePhoto = { url?: string; isMain?: boolean };
@@ -39,6 +44,8 @@ type Profile = {
 type MatchItem = {
   id: string;
   matchedAt: string;
+  isSuperLike?: boolean;
+  superLikedBy?: string;
   user: {
     id: string;
     name: string;
@@ -77,6 +84,7 @@ export default function MatchesScreen() {
   const [tab, setTab] = useState<'matches' | 'liked'>('matches');
   const [matches, setMatches] = useState<MatchItem[]>([]);
   const [liked, setLiked] = useState<Profile[]>([]);
+  const [superLikedIds, setSuperLikedIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
@@ -117,14 +125,21 @@ export default function MatchesScreen() {
     setLoading(true);
     setError('');
     try {
-      const [mRes, lRes] = await Promise.all([
+      const [mRes, lRes, sRes] = await Promise.all([
         matchService.getMatches(),
         discoveryService.getLikedSwiped(50),
+        discoveryService.getSuperLiked(50),
       ]);
       const m = mRes?.data?.matches || [];
       const l = lRes?.data?.profiles || [];
+      const s = sRes?.data?.profiles || [];
+      
+      // Create set of superliked user IDs
+      const superLikedSet = new Set<string>(s.map((p: any) => String(p._id || p.id)));
+      
       setMatches(m);
       setLiked(l);
+      setSuperLikedIds(superLikedSet);
     } catch (err: any) {
       setError(err?.message || 'Failed to load');
     } finally {
@@ -165,12 +180,66 @@ export default function MatchesScreen() {
     </View>
   );
 
+  // Animated Heart Component for SuperLike
+  const AnimatedHeart = () => {
+    const scaleAnim = useRef(new Animated.Value(1)).current;
+    const opacityAnim = useRef(new Animated.Value(1)).current;
+
+    useEffect(() => {
+      const pulse = Animated.loop(
+        Animated.sequence([
+          Animated.parallel([
+            Animated.timing(scaleAnim, {
+              toValue: 1.3,
+              duration: 600,
+              useNativeDriver: true,
+            }),
+            Animated.timing(opacityAnim, {
+              toValue: 0.7,
+              duration: 600,
+              useNativeDriver: true,
+            }),
+          ]),
+          Animated.parallel([
+            Animated.timing(scaleAnim, {
+              toValue: 1,
+              duration: 600,
+              useNativeDriver: true,
+            }),
+            Animated.timing(opacityAnim, {
+              toValue: 1,
+              duration: 600,
+              useNativeDriver: true,
+            }),
+          ]),
+        ])
+      );
+      pulse.start();
+      return () => pulse.stop();
+    }, [scaleAnim, opacityAnim]);
+
+    return (
+      <Animated.View
+        style={[
+          styles.superLikeHeartBadge,
+          {
+            transform: [{ scale: scaleAnim }],
+            opacity: opacityAnim,
+          },
+        ]}
+      >
+        <Ionicons name="heart" size={24} color="#FF1744" />
+      </Animated.View>
+    );
+  };
+
   const MatchCard = ({ item }: { item: MatchItem }) => {
     const img = getProfileImage(item.user);
     const isNew = (() => {
       const d = new Date(item.matchedAt).getTime();
       return Date.now() - d < 24 * 60 * 60 * 1000;
     })();
+    const isSuperLike = item.isSuperLike || item.superLikedBy || superLikedIds.has(String(item.user.id));
     const onChat = async () => {
       try {
         const res = await chatService.createConversation(item.id);
@@ -183,26 +252,94 @@ export default function MatchesScreen() {
         // noop; could show toast
       }
     };
-    return (
-      <View style={styles.card}>
-        <Image source={{ uri: img }} style={styles.avatar} />
-        <View style={{ flex: 1 }}>
-          <View style={styles.row}>
-            <Text style={styles.name}>{item.user.name}{item.user.age ? `, ${item.user.age}` : ''}</Text>
-            {isNew && (
-              <View style={styles.newBadge}><Text style={styles.newBadgeText}>NEW</Text></View>
-            )}
+    
+    return isSuperLike ? (
+      <LinearGradient
+        colors={['#4FC3F7', '#1E88E5']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.cardGradientWrapper}
+      >
+        <View style={[styles.card, styles.cardSuperLike]}>
+          <View style={styles.superLikeBadge}>
+            <Ionicons name="star" size={16} color={COLORS.gold} />
+            <Text style={styles.superLikeBadgeText}>Super Like</Text>
           </View>
-          <Text style={styles.meta}>Matched {humanizeMatchTime(item.matchedAt)}</Text>
-          <View style={styles.actions}>
-            <TouchableOpacity style={[styles.btn, styles.btnPrimary]} onPress={() => openMatchDetail(item)}>
-              <MaterialIcons name="person" size={18} color="#fff" />
-              <Text style={styles.btnPrimaryText}>View</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.btn, styles.btnOutline]} onPress={onChat}>
-              <MaterialIcons name="chat" size={18} color={COLORS.primary} />
-              <Text style={styles.btnOutlineText}>Chat</Text>
-            </TouchableOpacity>
+          <View style={styles.cardContent}>
+            <View style={styles.avatarContainer}>
+              <Image source={{ uri: img }} style={styles.avatar} />
+              {item.user.isOnline && <View style={styles.onlineBadge} />}
+              <AnimatedHeart />
+            </View>
+            <View style={{ flex: 1 }}>
+              <View style={styles.row}>
+                <Text style={styles.name}>{item.user.name}{item.user.age ? `, ${item.user.age}` : ''}</Text>
+                {isNew && (
+                  <View style={styles.newBadge}><Text style={styles.newBadgeText}>NEW</Text></View>
+                )}
+              </View>
+              {item.user.occupation && (
+                <Text style={styles.occupation} numberOfLines={1}>{item.user.occupation}</Text>
+              )}
+              <Text style={styles.meta}>Matched {humanizeMatchTime(item.matchedAt)}</Text>
+              <View style={styles.actions}>
+                <TouchableOpacity 
+                  style={[styles.btn, styles.btnPrimary]} 
+                  onPress={() => openMatchDetail(item)}
+                  activeOpacity={0.8}
+                >
+                  <MaterialIcons name="person" size={18} color="#fff" />
+                  <Text style={styles.btnPrimaryText}>View</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={[styles.btn, styles.btnOutline]} 
+                  onPress={onChat}
+                  activeOpacity={0.8}
+                >
+                  <MaterialIcons name="chat" size={18} color={COLORS.primary} />
+                  <Text style={styles.btnOutlineText}>Chat</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </View>
+      </LinearGradient>
+    ) : (
+      <View style={styles.card}>
+        <View style={styles.cardContent}>
+          <View style={styles.avatarContainer}>
+            <Image source={{ uri: img }} style={styles.avatar} />
+            {item.user.isOnline && <View style={styles.onlineBadge} />}
+          </View>
+          <View style={{ flex: 1 }}>
+            <View style={styles.row}>
+              <Text style={styles.name}>{item.user.name}{item.user.age ? `, ${item.user.age}` : ''}</Text>
+              {isNew && (
+                <View style={styles.newBadge}><Text style={styles.newBadgeText}>NEW</Text></View>
+              )}
+            </View>
+            {item.user.occupation && (
+              <Text style={styles.occupation} numberOfLines={1}>{item.user.occupation}</Text>
+            )}
+            <Text style={styles.meta}>Matched {humanizeMatchTime(item.matchedAt)}</Text>
+            <View style={styles.actions}>
+              <TouchableOpacity 
+                style={[styles.btn, styles.btnPrimary]} 
+                onPress={() => openMatchDetail(item)}
+                activeOpacity={0.8}
+              >
+                <MaterialIcons name="person" size={18} color="#fff" />
+                <Text style={styles.btnPrimaryText}>View</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.btn, styles.btnOutline]} 
+                onPress={onChat}
+                activeOpacity={0.8}
+              >
+                <MaterialIcons name="chat" size={18} color={COLORS.primary} />
+                <Text style={styles.btnOutlineText}>Chat</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </View>
@@ -212,6 +349,8 @@ export default function MatchesScreen() {
   const LikedCard = ({ item }: { item: Profile }) => {
     const img = getProfileImage(item);
     const displayName = item.name + (item.age ? `, ${item.age}` : '');
+    const isSuperLiked = superLikedIds.has(String(item._id || item.id));
+    
     const onSuperLike = () => {
       // Backend prevents re-swipe on same user; show friendly notice
       console.log('Superlike requested for', item._id || item.id);
@@ -221,20 +360,46 @@ export default function MatchesScreen() {
       console.log('Undo like requested for', item._id || item.id);
     };
     return (
-      <TouchableOpacity activeOpacity={0.9} onPress={() => openLikedDetail(item)} style={styles.card}>
-        <Image source={{ uri: img }} style={styles.avatar} />
-        <View style={{ flex: 1 }}>
-          <Text style={styles.name}>{displayName}</Text>
-          <Text style={styles.meta}>You liked this profile</Text>
-          <View style={styles.actions}>
-            <TouchableOpacity style={[styles.btn, styles.btnPrimary]} onPress={onSuperLike}>
-              <MaterialIcons name="favorite" size={18} color="#fff" />
-              <Text style={styles.btnPrimaryText}>Super Like</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.btn, styles.btnDanger]} onPress={onUndoLike}>
-              <MaterialIcons name="close" size={18} color="#fff" />
-              <Text style={styles.btnDangerText}>Undo Like</Text>
-            </TouchableOpacity>
+      <TouchableOpacity 
+        activeOpacity={0.9} 
+        onPress={() => openLikedDetail(item)}
+      >
+        <View style={styles.card}>
+          <View style={styles.cardContent}>
+            <View style={styles.avatarContainer}>
+              <Image source={{ uri: img }} style={styles.avatar} />
+              {item.isOnline && <View style={styles.onlineBadge} />}
+              {isSuperLiked && <AnimatedHeart />}
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.name}>{displayName}</Text>
+              {item.occupation && (
+                <Text style={styles.occupation} numberOfLines={1}>{item.occupation}</Text>
+              )}
+              <Text style={styles.meta}>
+                {isSuperLiked ? 'You superliked this profile ⭐' : 'You liked this profile'}
+              </Text>
+              <View style={styles.actions}>
+                {!isSuperLiked && (
+                  <TouchableOpacity 
+                    style={[styles.btn, styles.btnPrimary]} 
+                    onPress={onSuperLike}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="star" size={18} color="#fff" />
+                    <Text style={styles.btnPrimaryText}>Super Like</Text>
+                  </TouchableOpacity>
+                )}
+                <TouchableOpacity 
+                  style={[styles.btn, styles.btnDanger, isSuperLiked && { flex: 1 }]} 
+                  onPress={onUndoLike}
+                  activeOpacity={0.8}
+                >
+                  <MaterialIcons name="close" size={18} color="#fff" />
+                  <Text style={styles.btnDangerText}>Undo</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
           </View>
         </View>
       </TouchableOpacity>
@@ -326,7 +491,7 @@ const styles = StyleSheet.create({
   },
   tabs: {
     flexDirection: 'row',
-    backgroundColor: '#F3F4F6',
+    backgroundColor: '#E2E8F0',
     borderRadius: 12,
     padding: 4,
   },
@@ -339,6 +504,10 @@ const styles = StyleSheet.create({
   tabActive: {
     backgroundColor: '#fff',
     elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
   tabText: {
     color: COLORS.muted,
@@ -347,87 +516,164 @@ const styles = StyleSheet.create({
   tabTextActive: {
     color: COLORS.primary,
   },
+  cardGradientWrapper: {
+    borderRadius: 16,
+    padding: 3,
+    marginBottom: 16,
+  },
+  cardWrapper: {
+    marginBottom: 16,
+  },
   card: {
-    flexDirection: 'row',
     backgroundColor: '#fff',
-    borderRadius: 14,
-    padding: 12,
-    marginBottom: 12,
+    borderRadius: 16,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.08,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
     shadowRadius: 8,
-    elevation: 2,
+    elevation: 3,
+    overflow: 'hidden',
+  },
+  cardSuperLike: {
+    borderRadius: 14,
+  },
+  superLikeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF9E6',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    gap: 6,
+  },
+  superLikeBadgeText: {
+    color: '#D97706',
+    fontSize: 12,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+  },
+  cardContent: {
+    flexDirection: 'row',
+    padding: 12,
+  },
+  avatarContainer: {
+    position: 'relative',
+    marginRight: 12,
   },
   avatar: {
-    width: 64,
-    height: 64,
-    borderRadius: 12,
-    marginRight: 12,
+    width: 72,
+    height: 72,
+    borderRadius: 16,
     backgroundColor: '#eee',
+  },
+  onlineBadge: {
+    position: 'absolute',
+    bottom: 4,
+    right: 4,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: COLORS.green,
+    borderWidth: 2,
+    borderColor: '#fff',
+  },
+  superLikeHeartBadge: {
+    position: 'absolute',
+    top: -8,
+    right: -8,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#FFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#FF1744',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.5,
+    shadowRadius: 8,
+    elevation: 8,
   },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   name: {
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: '800',
     color: COLORS.text,
     marginRight: 8,
   },
+  occupation: {
+    fontSize: 13,
+    color: COLORS.muted,
+    marginTop: 2,
+  },
   newBadge: {
-    backgroundColor: '#E8F8F0',
+    backgroundColor: '#E6F7EF',
     borderColor: COLORS.green,
-    borderWidth: 1,
+    borderWidth: 1.5,
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 999,
   },
   newBadgeText: {
     color: COLORS.green,
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '800',
+    letterSpacing: 0.5,
   },
   meta: {
     color: COLORS.muted,
     marginTop: 4,
+    fontSize: 13,
   },
   actions: {
     flexDirection: 'row',
-    marginTop: 8,
+    marginTop: 10,
     gap: 8,
   },
   btn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
     borderRadius: 10,
   },
   btnPrimary: {
     backgroundColor: COLORS.primary,
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 2,
   },
   btnPrimaryText: {
     color: '#fff',
     fontWeight: '700',
+    fontSize: 14,
   },
   btnOutline: {
     backgroundColor: '#fff',
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: COLORS.primary,
   },
   btnOutlineText: {
     color: COLORS.primary,
     fontWeight: '700',
+    fontSize: 14,
   },
   btnDanger: {
     backgroundColor: COLORS.red,
+    shadowColor: COLORS.red,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 2,
   },
   btnDangerText: {
     color: '#fff',
     fontWeight: '700',
+    fontSize: 14,
   },
   centered: {
     flex: 1,

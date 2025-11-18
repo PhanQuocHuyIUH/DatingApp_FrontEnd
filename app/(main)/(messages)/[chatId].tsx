@@ -10,6 +10,7 @@ import {
   Platform,
   KeyboardAvoidingView,
 } from "react-native";
+import { LinearGradient } from 'expo-linear-gradient';
 import { Stack, useLocalSearchParams, router } from "expo-router";
 import {
   Feather,
@@ -34,6 +35,8 @@ const COLORS = {
   lightGray: "#F3F4F6", // Màu nền cho input
   gray: "#E5E7EB",
   blueCheck: "#3B82F6",
+  superLike: "#1E90FF",
+  gold: "#FFD700",
 };
 
 type ChatMessage = {
@@ -48,27 +51,50 @@ type ChatMessage = {
 };
 
 // --- Component Tin nhắn (của mình) ---
-const MyMessageBubble = ({ text, time }: { text: string; time: string }) => (
+const MyMessageBubble = ({ text, time, isSuper }: { text: string; time: string; isSuper?: boolean }) => (
   <View style={styles.myMessageContainer}>
-    <View style={styles.myMessageBubble}>
-      <Text style={styles.myMessageText}>{text}</Text>
-    </View>
+    {isSuper ? (
+      <LinearGradient
+        colors={['#4FC3F7', '#1E88E5', '#1565C0']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.myMessageBubble}
+      >
+        <Text style={styles.myMessageText}>{text}</Text>
+      </LinearGradient>
+    ) : (
+      <View style={[styles.myMessageBubble, { backgroundColor: COLORS.primary }]}>
+        <Text style={styles.myMessageText}>{text}</Text>
+      </View>
+    )}
     <Text style={styles.messageTime}>{time}</Text>
   </View>
 );
 
-const TheirMessageBubble = ({ text, time }: { text: string; time: string }) => (
+const TheirMessageBubble = ({ text, time, isSuper }: { text: string; time: string; isSuper?: boolean }) => (
   <View style={styles.theirMessageContainer}>
-    <View style={styles.theirMessageBubble}>
-      <Text style={styles.theirMessageText}>{text}</Text>
-    </View>
+    {isSuper ? (
+      <LinearGradient
+        colors={['#FFD700', '#FFA500', '#FF8C00']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.theirMessageBubble}
+      >
+        <Text style={[styles.theirMessageText, { color: COLORS.white }]}>{text}</Text>
+      </LinearGradient>
+    ) : (
+      <View style={[styles.theirMessageBubble, { backgroundColor: COLORS.lightGray }]}>
+        <Text style={styles.theirMessageText}>{text}</Text>
+      </View>
+    )}
     <Text style={styles.messageTime}>{time}</Text>
   </View>
 );
 
 // --- Màn hình chính ---
 export default function ChatScreen() {
-  const { chatId, matchId, userName, userAge, avatar, userId } = useLocalSearchParams<{ chatId: string; matchId?: string; userName?: string; userAge?: string; avatar?: string; userId?: string }>();
+  const { chatId, matchId, userName, userAge, avatar, userId, isSuperLike } = useLocalSearchParams<{ chatId: string; matchId?: string; userName?: string; userAge?: string; avatar?: string; userId?: string; isSuperLike?: string }>();
+  const isSuper = isSuperLike === 'true';
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(true);
@@ -76,7 +102,6 @@ export default function ChatScreen() {
   const [typing, setTyping] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
   const insets = useSafeAreaInsets();
-  const [inputHeight, setInputHeight] = useState(0);
   const headerHeight = useHeaderHeight();
 
   const headerUser = useMemo(() => ({
@@ -95,6 +120,10 @@ export default function ChatScreen() {
       const res = await chatService.getMessages(String(chatId), { limit: 50 });
       const list = res?.data?.messages || [];
       setMessages(list);
+      // Auto scroll to bottom after loading messages
+      setTimeout(() => {
+        scrollRef.current?.scrollToEnd({ animated: true });
+      }, 300);
     } catch {
       // ignore for now
     } finally {
@@ -105,6 +134,15 @@ export default function ChatScreen() {
   useEffect(() => {
     loadMessages();
   }, [loadMessages]);
+
+  useEffect(() => {
+    // Scroll to bottom whenever messages change
+    if (messages.length > 0) {
+      setTimeout(() => {
+        scrollRef.current?.scrollToEnd({ animated: true });
+      }, 100);
+    }
+  }, [messages]);
 
   // No manual keyboard listeners needed with KeyboardStickyView
 
@@ -182,18 +220,31 @@ export default function ChatScreen() {
     };
   }, [chatId, userId, currentUserId]);
 
-  // Hàm này sẽ điều hướng đến trang video call
+  // Hàm này sẽ điều hướng đến trang video call với thông tin người dùng
   const onVideoCallPress = () => {
-    router.push('/(main)/(messages)/video-call');
+    router.push({
+      pathname: '/(main)/(messages)/video-call',
+      params: {
+        userName: userName || 'User',
+        userAge: userAge || '',
+        avatar: avatar || '',
+        userId: userId || '',
+      },
+    });
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? headerHeight + 10 : 0}
-    >
-      <StatusBar style="dark" />
+    <View style={{ flex: 1 }}>
+      <LinearGradient
+        colors={['#ffffff', '#fef5f7', '#fef9fa']}
+        style={{ flex: 1 }}
+      >
+        <KeyboardAvoidingView
+          style={styles.container}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? headerHeight : 0}
+        >
+          <StatusBar style="dark" />
 
       {/* --- Cấu hình Header --- */}
       <Stack.Screen
@@ -247,10 +298,10 @@ export default function ChatScreen() {
       <ScrollView
         ref={scrollRef}
         style={styles.chatContainer}
-        contentContainerStyle={{ paddingTop: 16, paddingBottom: 16 + inputHeight }}
+        contentContainerStyle={{ paddingTop: 16, paddingBottom: 20 }}
         keyboardShouldPersistTaps="handled"
-        keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
-        automaticallyAdjustKeyboardInsets={true}
+        keyboardDismissMode="on-drag"
+        onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
       >
         {loading ? (
           <Text style={styles.dateSeparator}>Loading...</Text>
@@ -263,26 +314,22 @@ export default function ChatScreen() {
             // Use unique key: combine _id/id with index to prevent duplicates
             const uniqueKey = `${m._id || m.id || 'temp'}-${idx}`;
             return isMine ? (
-              <MyMessageBubble key={uniqueKey} text={m.text || ''} time={time} />
+              <MyMessageBubble key={uniqueKey} text={m.text || ''} time={time} isSuper={isSuper} />
             ) : (
-              <TheirMessageBubble key={uniqueKey} text={m.text || ''} time={time} />
+              <TheirMessageBubble key={uniqueKey} text={m.text || ''} time={time} isSuper={isSuper} />
             );
           })
         )}
       </ScrollView>
       {!!typing && <Text style={styles.typingIndicator}>{headerUser.name} is typing...</Text>}
 
-      {/* Mini-game banner removed */}
-
       {/* --- 3. Ô nhập tin nhắn --- */}
       <View
-        onLayout={(e) => setInputHeight(e.nativeEvent.layout.height)}
         style={[
           styles.inputContainer,
-          { paddingBottom: Platform.OS === 'ios' ? 12 + insets.bottom : 12 },
-        ]}
-      >
-        {/* Hàng 1: Text Input */}
+          { paddingBottom: Platform.OS === 'ios' ? insets.bottom + 8 : 12 },
+        ]
+      }>
         <View style={styles.textInputRow}>
           <TextInput
             style={styles.textInput}
@@ -297,33 +344,6 @@ export default function ChatScreen() {
             }}
             multiline
           />
-          <TouchableOpacity style={styles.emojiButton}>
-            <Ionicons
-              name="happy-outline"
-              size={24}
-              color={COLORS.textSecondary}
-            />
-          </TouchableOpacity>
-        </View>
-        {/* Hàng 2: Action Icons */}
-        <View style={styles.actionRow}>
-          <View style={styles.actionIconsLeft}>
-            <TouchableOpacity style={styles.actionIcon}>
-              <Ionicons name="location-outline" size={24} color={COLORS.primary} />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.actionIcon}>
-              <Ionicons name="bulb-outline" size={24} color={COLORS.primary} />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.actionIcon}>
-              <Ionicons name="image-outline" size={24} color={COLORS.primary} />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.actionIcon}>
-              <Ionicons name="camera-outline" size={24} color={COLORS.primary} />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.actionIcon}>
-              <Ionicons name="mic-outline" size={24} color={COLORS.primary} />
-            </TouchableOpacity>
-          </View>
           <TouchableOpacity
             style={styles.sendButton}
             onPress={async () => {
@@ -344,18 +364,24 @@ export default function ChatScreen() {
               }
             }}
           >
-            <Ionicons name="send" size={22} color={COLORS.primary} />
+            <LinearGradient
+              colors={[COLORS.primary, '#d63865']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.sendButtonGradient}
+            >
+              <Ionicons name="send" size={20} color={COLORS.white} />
+            </LinearGradient>
           </TouchableOpacity>
         </View>
-      </View>
-    </KeyboardAvoidingView>
+        </View>
+      </KeyboardAvoidingView>
+      </LinearGradient>
+    </View>
   );
-}
-
-const styles = StyleSheet.create({
+}const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.white,
   },
   // --- Header Styles ---
   headerTitleContainer: {
@@ -412,20 +438,28 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   myMessageBubble: {
-    backgroundColor: COLORS.primary, // Đổi màu
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderRadius: 20,
-    borderBottomRightRadius: 4, // Góc bo
+    borderBottomRightRadius: 4,
     maxWidth: "80%",
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   theirMessageBubble: {
-    backgroundColor: COLORS.lightGray,
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderRadius: 20,
     borderBottomLeftRadius: 4,
     maxWidth: '80%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   myMessageText: {
     color: COLORS.white,
@@ -469,24 +503,18 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
     color: COLORS.text,
-    maxHeight: 100, // Giới hạn chiều cao khi gõ nhiều
-  },
-  emojiButton: {
-    marginLeft: 10,
-  },
-  actionRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginTop: 12,
-  },
-  actionIconsLeft: {
-    flexDirection: "row",
-  },
-  actionIcon: {
-    marginRight: 16,
+    maxHeight: 100,
+    marginRight: 12,
   },
   sendButton: {
-    // Thêm style cho nút send nếu muốn
+    borderRadius: 20,
+    overflow: 'hidden',
+  },
+  sendButtonGradient: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

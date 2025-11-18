@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -8,7 +8,7 @@ import {
   Image,
   Platform,
 } from "react-native";
-import { Stack, router } from "expo-router";
+import { Stack, router, useLocalSearchParams } from "expo-router";
 import {
   Feather,
   Ionicons,
@@ -25,18 +25,65 @@ const COLORS = {
   darkTransparent: "rgba(0, 0, 0, 0.4)", // Nền cho control
 };
 
-// --- Dữ liệu giả ---
-const user = {
-  name: "Ava Jones",
-  // Ảnh nền (sẽ được làm mờ)
-  profilePhoto:
-    "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=387&q=80",
-  // Ảnh avatar (rõ nét)
-  avatar:
-    "https://images.unsplash.com/photo-1580489944761-15a19d654956?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%D&auto=format&fit=crop&w=761&q=80",
-};
-
 export default function VideoCallScreen() {
+  const { userName, userAge, avatar } = useLocalSearchParams<{
+    userName?: string;
+    userAge?: string;
+    avatar?: string;
+  }>();
+
+  const [callStatus, setCallStatus] = useState<'calling' | 'connected' | 'ended'>('calling');
+  const [isMuted, setIsMuted] = useState(false);
+  const [isVideoOff, setIsVideoOff] = useState(false);
+  const [callDuration, setCallDuration] = useState(0);
+
+  // Simulate call connecting after 3 seconds
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setCallStatus('connected');
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Call duration timer
+  useEffect(() => {
+    if (callStatus !== 'connected') return;
+    const interval = setInterval(() => {
+      setCallDuration(prev => prev + 1);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [callStatus]);
+
+  const formatDuration = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const handleEndCall = () => {
+    setCallStatus('ended');
+    router.back();
+  };
+
+  const user = {
+    name: userName || "User",
+    age: userAge,
+    profilePhoto: avatar || "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=387&q=80",
+    avatar: avatar || "https://images.unsplash.com/photo-1580489944761-15a19d654956?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%D&auto=format&fit=crop&w=761&q=80",
+  };
+
+  const getStatusText = () => {
+    switch (callStatus) {
+      case 'calling':
+        return 'Calling...';
+      case 'connected':
+        return formatDuration(callDuration);
+      case 'ended':
+        return 'Call Ended';
+      default:
+        return 'Calling...';
+    }
+  };
   return (
     <View style={styles.container}>
       {/* Đổi chữ trên thanh status bar sang màu trắng */}
@@ -66,15 +113,47 @@ export default function VideoCallScreen() {
 
         {/* --- 2. Thông tin người gọi --- */}
         <View style={styles.centerContainer}>
-          <View style={styles.avatarOuter}>
+          <View style={[styles.avatarOuter, callStatus === 'connected' && styles.avatarConnected]}>
             <Image source={{ uri: user.avatar }} style={styles.avatar} />
+            {callStatus === 'connected' && (
+              <View style={styles.connectedBadge}>
+                <MaterialCommunityIcons name="phone" size={16} color={COLORS.white} />
+              </View>
+            )}
           </View>
-          <Text style={styles.nameText}>{user.name}</Text>
-          <Text style={styles.statusText}>Calling...</Text>
+          <Text style={styles.nameText}>
+            {user.name}{user.age ? `, ${user.age}` : ''}
+          </Text>
+          <Text style={styles.statusText}>{getStatusText()}</Text>
+          {callStatus === 'calling' && (
+            <View style={styles.callingAnimation}>
+              <MaterialCommunityIcons name="phone-ring" size={20} color={COLORS.textSecondary} />
+            </View>
+          )}
         </View>
 
         {/* --- 3. Nút điều khiển dưới cùng --- */}
         <View style={styles.bottomControls}>
+          <TouchableOpacity 
+            style={styles.controlButton}
+            onPress={() => setIsVideoOff(!isVideoOff)}
+          >
+            <MaterialCommunityIcons
+              name={isVideoOff ? "video-off-outline" : "video-outline"}
+              size={30}
+              color={COLORS.white}
+            />
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.controlButton, isMuted && styles.controlButtonActive]}
+            onPress={() => setIsMuted(!isMuted)}
+          >
+            <Ionicons 
+              name={isMuted ? "mic-off-outline" : "mic-outline"} 
+              size={30} 
+              color={COLORS.white} 
+            />
+          </TouchableOpacity>
           <TouchableOpacity style={styles.controlButton}>
             <MaterialCommunityIcons
               name="camera-flip-outline"
@@ -82,12 +161,9 @@ export default function VideoCallScreen() {
               color={COLORS.white}
             />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.controlButton}>
-            <Ionicons name="mic-off-outline" size={30} color={COLORS.white} />
-          </TouchableOpacity>
           <TouchableOpacity
             style={[styles.controlButton, styles.endCallButton]}
-            onPress={() => router.back()} // Nút tắt gọi sẽ đóng modal
+            onPress={handleEndCall}
           >
             <MaterialCommunityIcons
               name="phone-hangup"
@@ -133,6 +209,24 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     opacity: 0.9,
+    position: 'relative',
+  },
+  avatarConnected: {
+    borderWidth: 3,
+    borderColor: '#22C55E',
+  },
+  connectedBadge: {
+    position: 'absolute',
+    bottom: 5,
+    right: 5,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#22C55E',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: COLORS.white,
   },
   avatar: {
     width: 120,
@@ -156,6 +250,10 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 3,
   },
+  callingAnimation: {
+    marginTop: 16,
+    opacity: 0.8,
+  },
   bottomControls: {
     flexDirection: "row",
     justifyContent: "space-around",
@@ -174,6 +272,9 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255, 255, 255, 0.2)", // Trắng mờ
     justifyContent: "center",
     alignItems: "center",
+  },
+  controlButtonActive: {
+    backgroundColor: COLORS.primary,
   },
   endCallButton: {
     backgroundColor: COLORS.primary, // Màu đỏ đô
