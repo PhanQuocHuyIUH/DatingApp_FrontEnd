@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { matchService } from '../../../services/matchService';
+import { chatService } from '../../../services/chatService';
 import { discoveryService } from '../../../services/discoveryService';
 
 type ProfilePhoto = { url: string } | string;
@@ -125,8 +126,32 @@ export default function MatchDetailScreen() {
 		return `${profile.name || 'Profile'}${age}`;
 	};
 
-	const handleChat = () => {
-		Alert.alert('Chat', 'Chat navigation will be wired soon.');
+	const handleChat = async () => {
+		if (!isMatchType || !match?.id) return;
+		try {
+			setLoading(true);
+			const res = await chatService.createConversation(match.id);
+			const conv = res?.data?.conversation || res?.conversation || res?.data;
+			if (conv?.id) {
+				const other = conv.participants?.find?.((p: any) => String(p._id) !== String((profile as any)?.id || (profile as any)?._id));
+				const header = other ? {
+					userName: other.name,
+					userAge: other.age,
+					avatar: (other.photos?.find?.((ph:any)=>ph.isMain && ph.url)?.url) || (other.photos?.[0]?.url) || undefined,
+				} : {};
+				const otherUser = conv.participants?.find?.((p:any)=> String(p._id) !== String((profile as any)?.id || (profile as any)?._id));
+				router.push({
+					pathname: '/(main)/(messages)/[chatId]',
+					params: { chatId: String(conv.id), matchId: String(match.id), userId: otherUser?._id || '', ...header },
+				});
+			} else {
+				Alert.alert('Error', 'Failed to open conversation');
+			}
+		} catch (e: any) {
+			Alert.alert('Error', e?.message || 'Failed to create conversation');
+		} finally {
+			setLoading(false);
+		}
 	};
 
 	const handleUnmatch = () => {
