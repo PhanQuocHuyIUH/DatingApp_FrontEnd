@@ -1,5 +1,5 @@
 import { router } from "expo-router";
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import {
   SafeAreaView,
   StyleSheet,
@@ -7,8 +7,10 @@ import {
   TouchableOpacity,
   View,
   Alert,
+  Animated,
 } from "react-native";
 import { FontAwesome, Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from 'expo-linear-gradient';
 
 const COLORS = {
   primary: "#b21e46",
@@ -19,6 +21,57 @@ const COLORS = {
   white: "#FFFFFF",
   black: "#000000",
   facebook: "#1877F2",
+};
+
+// Animated Heart Component
+const AnimatedHeart = () => {
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+  const opacityAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.parallel([
+        Animated.sequence([
+          Animated.timing(scaleAnim, {
+            toValue: 1.6,
+            duration: 1000,
+            useNativeDriver: true,
+          }),
+          Animated.timing(scaleAnim, {
+            toValue: 1,
+            duration: 1000,
+            useNativeDriver: true,
+          }),
+        ]),
+        Animated.sequence([
+          Animated.timing(opacityAnim, {
+            toValue: 0.6,
+            duration: 1000,
+            useNativeDriver: true,
+          }),
+          Animated.timing(opacityAnim, {
+            toValue: 1,
+            duration: 1000,
+            useNativeDriver: true,
+          }),
+        ]),
+      ])
+    ).start();
+  }, [scaleAnim, opacityAnim]);
+
+  return (
+    <Animated.View
+      style={[
+        styles.heartContainer,
+        {
+          transform: [{ scale: scaleAnim }],
+          opacity: opacityAnim,
+        },
+      ]}
+    >
+      <FontAwesome name="heart" size={50} color={COLORS.white} />
+    </Animated.View>
+  );
 };
 
 export default function AuthIndexScreen() {
@@ -39,15 +92,22 @@ export default function AuthIndexScreen() {
     <SafeAreaView style={styles.container}>
       {/* Phần logo và tiêu đề */}
       <View style={styles.headerContainer}>
-        <View style={styles.logoSuperOuter}>
-          <View style={styles.logoOuter}>
-            <View style={styles.logoInner}>
-              <FontAwesome name="heart" size={50} color={COLORS.white} />
-            </View>
-          </View>
-        </View>
-
-
+        <LinearGradient
+          colors={['#fae0e7', '#fdb5c8', '#f78fb3']}
+          style={styles.logoSuperOuter}
+        >
+          <LinearGradient
+            colors={['#cc5073', '#d6697f', '#e0828b']}
+            style={styles.logoOuter}
+          >
+            <LinearGradient
+              colors={['#b21e46', '#c92a52', '#d6365e']}
+              style={styles.logoInner}
+            >
+              <AnimatedHeart />
+            </LinearGradient>
+          </LinearGradient>
+        </LinearGradient>
 
         <Text style={styles.title}>Chilling Date</Text>
 
@@ -141,16 +201,19 @@ const styles = StyleSheet.create({
     width: 180,
     height: 180,
     borderRadius: 90,
-    backgroundColor: COLORS.secondary,
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 20,
+    shadowColor: '#b21e46',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 12,
   },
   logoOuter: {
     width: 140,
     height: 140,
     borderRadius: 70,
-    backgroundColor: COLORS.accent,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -158,9 +221,12 @@ const styles = StyleSheet.create({
     width: 100,
     height: 100,
     borderRadius: 50,
-    backgroundColor: COLORS.primary,
     alignItems: "center",
     justifyContent: "center",
+  },
+  heartContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   title: {
     fontSize: 32,

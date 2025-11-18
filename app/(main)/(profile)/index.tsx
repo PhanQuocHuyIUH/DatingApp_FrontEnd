@@ -16,19 +16,27 @@ import {
   Text,
   TouchableOpacity,
   View,
+  Animated,
 } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import { authService } from "../../../services/authService";
 import { userService } from "../../../services/userService";
 
 const COLORS = {
-  primary: "#b21e46",
-  primaryLight: "#cc5073",
-  secondary: "#fae0e7",
-  text: "#1F2937",
-  textSecondary: "#6B7280",
+  primary: "#FF6B9D",
+  primaryDark: "#C92A6D",
+  primaryLight: "#FFB4D5",
+  secondary: "#FEF3F7",
+  accent: "#FFD93D",
+  text: "#2D3748",
+  textSecondary: "#718096",
   white: "#FFFFFF",
-  gray: "#E5E7EB",
-  lightGray: "#F3F4F6",
+  gray: "#E2E8F0",
+  lightGray: "#F7FAFC",
+  gradient1: ["#FF6B9D", "#C92A6D"],
+  gradient2: ["#FFB4D5", "#FF6B9D"],
+  gradient3: ["#FEF3F7", "#FFE8F3"],
+  shadow: "rgba(201, 42, 109, 0.3)",
 };
 
 type ProfileInfoProps = {
@@ -73,6 +81,8 @@ export default function ProfileScreen() {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const fadeAnim = useState(new Animated.Value(0))[0];
+  const scaleAnim = useState(new Animated.Value(0.9))[0];
 
   const fetchProfile = async () => {
     try {
@@ -100,7 +110,21 @@ export default function ProfileScreen() {
     useCallback(() => {
       setLoading(true);
       fetchProfile();
-    }, [])
+      // Animate on mount
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 600,
+          useNativeDriver: true,
+        }),
+        Animated.spring(scaleAnim, {
+          toValue: 1,
+          tension: 50,
+          friction: 7,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }, [fadeAnim, scaleAnim])
   );
 
   const onRefresh = useCallback(() => {
@@ -173,44 +197,70 @@ export default function ProfileScreen() {
       <ScrollView
         style={styles.container}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[COLORS.primary]} />
         }
       >
-        <View style={styles.header}>
-          <Image source={{ uri: mainPhoto }} style={styles.profileImage} />
-          <Text style={styles.name}>
-            {user.name}, {getAge(user.dob)}
-          </Text>
-          <Text style={styles.location}>
-            {user.location?.city || "Unknown Location"}
-          </Text>
-          <TouchableOpacity
-            style={styles.editButton}
-            onPress={() => router.push("/(main)/(profile)/edit")}
+        <Animated.View style={[{ opacity: fadeAnim, transform: [{ scale: scaleAnim }] }]}>
+          <LinearGradient
+            colors={COLORS.gradient2 as any}
+            style={styles.header}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
           >
-            <Feather name="edit-2" size={16} color={COLORS.primary} />
-            <Text style={styles.editButtonText}>Edit Profile</Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>About Me</Text>
-          <Text style={styles.bio}>{user.bio || "No bio yet."}</Text>
-        </View>
-
-        {user.interests && user.interests.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Interests</Text>
-            <View style={styles.pillContainer}>
-              {(user.interests ?? []).map((interest) => (
-                <Pill key={interest} label={interest} />
-              ))}
+            <View style={styles.profileImageContainer}>
+              <Image source={{ uri: mainPhoto }} style={styles.profileImage} />
+              <LinearGradient
+                colors={['transparent', 'rgba(0,0,0,0.1)']}
+                style={styles.imageOverlay}
+              />
             </View>
-          </View>
-        )}
+            <Text style={styles.name}>
+              {user.name}, {getAge(user.dob)}
+            </Text>
+            <View style={styles.locationContainer}>
+              <Ionicons name="location" size={16} color={COLORS.white} />
+              <Text style={styles.location}>
+                {user.location?.city || "Unknown Location"}
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={styles.editButton}
+              onPress={() => router.push("/(main)/(profile)/edit")}
+              activeOpacity={0.8}
+            >
+              <Feather name="edit-2" size={16} color={COLORS.white} />
+              <Text style={styles.editButtonText}>Edit Profile</Text>
+            </TouchableOpacity>
+          </LinearGradient>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>My Details</Text>
+          <View style={styles.contentContainer}>
+            <View style={styles.card}>
+              <View style={styles.cardHeader}>
+                <Ionicons name="heart" size={20} color={COLORS.primary} />
+                <Text style={styles.sectionTitle}>About Me</Text>
+              </View>
+              <Text style={styles.bio}>{user.bio || "No bio yet."}</Text>
+            </View>
+
+            {user.interests && user.interests.length > 0 && (
+              <View style={styles.card}>
+                <View style={styles.cardHeader}>
+                  <Ionicons name="star" size={20} color={COLORS.accent} />
+                  <Text style={styles.sectionTitle}>Interests</Text>
+                </View>
+                <View style={styles.pillContainer}>
+                  {(user.interests ?? []).map((interest, idx) => (
+                    <Pill key={interest} label={interest} />
+                  ))}
+                </View>
+              </View>
+            )}
+
+            <View style={styles.card}>
+              <View style={styles.cardHeader}>
+                <Ionicons name="information-circle" size={20} color={COLORS.primary} />
+                <Text style={styles.sectionTitle}>My Details</Text>
+              </View>
           {user.occupation && (
             <ProfileInfo
               icon={
@@ -274,16 +324,21 @@ export default function ProfileScreen() {
           )}
         </View>
 
-        {user.languages && user.languages.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>I Communicate In</Text>
-            <View style={styles.pillContainer}>
-              {(user.languages ?? []).map((lang) => (
-                <Pill key={lang} label={lang} />
-              ))}
-            </View>
+            {user.languages && user.languages.length > 0 && (
+              <View style={styles.card}>
+                <View style={styles.cardHeader}>
+                  <Ionicons name="language" size={20} color={COLORS.primary} />
+                  <Text style={styles.sectionTitle}>I Communicate In</Text>
+                </View>
+                <View style={styles.pillContainer}>
+                  {(user.languages ?? []).map((lang) => (
+                    <Pill key={lang} label={lang} />
+                  ))}
+                </View>
+              </View>
+            )}
           </View>
-        )}
+        </Animated.View>
       </ScrollView>
     </>
   );
@@ -294,92 +349,149 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.lightGray,
   },
   container: {
     flex: 1,
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.lightGray,
   },
   header: {
     alignItems: "center",
-    padding: 20,
-    backgroundColor: COLORS.lightGray,
-    paddingBottom: 30,
+    padding: 30,
+    paddingTop: 40,
+    paddingBottom: 40,
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
+  },
+  profileImageContainer: {
+    position: 'relative',
+    marginBottom: 20,
   },
   profileImage: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    borderWidth: 3,
-    borderColor: COLORS.primary,
-    marginBottom: 15,
+    width: 140,
+    height: 140,
+    borderRadius: 70,
+    borderWidth: 5,
+    borderColor: COLORS.white,
+    shadowColor: COLORS.shadow,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 10,
+  },
+  imageOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 70,
+    borderBottomLeftRadius: 70,
+    borderBottomRightRadius: 70,
   },
   name: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: COLORS.text,
+    fontSize: 28,
+    fontWeight: "800",
+    color: COLORS.white,
+    textShadowColor: 'rgba(0,0,0,0.2)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
+  },
+  locationContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
   },
   location: {
     fontSize: 16,
-    color: COLORS.textSecondary,
-    marginTop: 4,
+    color: COLORS.white,
+    marginLeft: 4,
+    opacity: 0.95,
   },
   editButton: {
     flexDirection: "row",
     alignItems: "center",
-    marginTop: 20,
-    backgroundColor: COLORS.secondary,
-    paddingVertical: 8,
-    paddingHorizontal: 20,
-    borderRadius: 20,
+    marginTop: 24,
+    backgroundColor: COLORS.white,
+    paddingVertical: 12,
+    paddingHorizontal: 28,
+    borderRadius: 25,
+    shadowColor: COLORS.shadow,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 5,
   },
   editButtonText: {
     color: COLORS.primary,
-    fontWeight: "bold",
+    fontWeight: "700",
+    fontSize: 15,
     marginLeft: 8,
   },
-  section: {
+  contentContainer: {
+    padding: 16,
+  },
+  card: {
+    backgroundColor: COLORS.white,
+    borderRadius: 20,
     padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.gray,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: "bold",
+    fontWeight: "700",
     color: COLORS.text,
-    marginBottom: 15,
+    marginLeft: 10,
   },
   bio: {
-    fontSize: 16,
+    fontSize: 15,
     color: COLORS.textSecondary,
     lineHeight: 24,
   },
   infoRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 15,
+    marginBottom: 16,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: COLORS.secondary,
+    borderRadius: 12,
   },
   infoLabel: {
-    fontSize: 16,
+    fontSize: 15,
     color: COLORS.text,
-    marginLeft: 15,
+    marginLeft: 12,
+    fontWeight: '500',
   },
   infoValue: {
-    fontSize: 16,
-    color: COLORS.textSecondary,
+    fontSize: 15,
+    color: COLORS.primary,
     marginLeft: "auto",
+    fontWeight: '600',
   },
   pillContainer: {
     flexDirection: "row",
     flexWrap: "wrap",
+    marginTop: 4,
   },
   pill: {
     backgroundColor: COLORS.secondary,
     borderRadius: 20,
-    paddingVertical: 8,
-    paddingHorizontal: 15,
+    paddingVertical: 10,
+    paddingHorizontal: 18,
     marginRight: 10,
     marginBottom: 10,
+    borderWidth: 1,
+    borderColor: COLORS.primaryLight,
   },
   pillText: {
     color: COLORS.primary,

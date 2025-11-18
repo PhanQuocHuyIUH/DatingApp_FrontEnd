@@ -1,9 +1,10 @@
 // app/(main)/(discover)/_layout.tsx
 
-import { Feather, Ionicons } from "@expo/vector-icons";
+import { Feather, Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { Stack, router } from "expo-router";
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { StyleSheet, TouchableOpacity, View } from "react-native";
+import { discoveryService } from "../../../services/discoveryService";
 
 // --- Bảng màu ---
 const COLORS = {
@@ -21,6 +22,48 @@ const HeaderProgressBar = () => (
 );
 
 export default function DiscoverStackLayout() {
+  const [hasActiveFilters, setHasActiveFilters] = useState(false);
+
+  useEffect(() => {
+    // Check if filters are active
+    const checkFilters = () => {
+      const filters = discoveryService.activeFilters || {};
+      const hasFilters = Object.keys(filters).length > 0;
+      setHasActiveFilters(hasFilters);
+    };
+
+    // Initial check
+    checkFilters();
+
+    // Listen for filter changes
+    const handleFiltersApplied = () => {
+      checkFilters();
+    };
+
+    const handleFiltersCleared = () => {
+      setHasActiveFilters(false);
+    };
+
+    discoveryService.on('filtersApplied', handleFiltersApplied);
+    discoveryService.on('filtersCleared', handleFiltersCleared);
+
+    return () => {
+      discoveryService.off('filtersApplied', handleFiltersApplied);
+      discoveryService.off('filtersCleared', handleFiltersCleared);
+    };
+  }, []);
+
+  const handleRefresh = () => {
+    // Emit event to reload profiles
+    discoveryService.emit('refreshRequested');
+  };
+
+  const handleClearFilters = () => {
+    if (hasActiveFilters) {
+      discoveryService.clearFilters();
+    }
+  };
+
   return (
     <Stack
       screenOptions={{
@@ -32,14 +75,6 @@ export default function DiscoverStackLayout() {
       <Stack.Screen
         name="index"
         options={{
-          // Options cho Tab Bar
-          title: "Discover",
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="compass-outline" size={size} color={color} />
-          ),
-          tabBarActiveTintColor: COLORS.primary,
-          tabBarInactiveTintColor: COLORS.textSecondary,
-
           // Options cho Header
           headerTitle: "Chilling Date",
           headerTitleAlign: "center",
@@ -49,15 +84,24 @@ export default function DiscoverStackLayout() {
           },
           headerLeft: () => (
             <View style={styles.headerIcons}>
-              <TouchableOpacity>
-                <Feather
-                  name="menu"
-                  size={26}
-                  color={COLORS.textSecondary}
-                  style={{ marginRight: 16 }}
-                />
+              <TouchableOpacity onPress={handleClearFilters}>
+                {hasActiveFilters ? (
+                  <MaterialCommunityIcons
+                    name="filter-off"
+                    size={26}
+                    color={COLORS.primary}
+                    style={{ marginRight: 16 }}
+                  />
+                ) : (
+                  <Feather
+                    name="menu"
+                    size={26}
+                    color={COLORS.textSecondary}
+                    style={{ marginRight: 16 }}
+                  />
+                )}
               </TouchableOpacity>
-              <TouchableOpacity>
+              <TouchableOpacity onPress={handleRefresh}>
                 <Ionicons
                   name="refresh"
                   size={26}
@@ -67,15 +111,19 @@ export default function DiscoverStackLayout() {
             </View>
           ),
           headerRight: () => (
-            <TouchableOpacity onPress={() => router.push("/(main)/(discover)/filters")}>
-              <Ionicons
-                name="options-outline"
-                size={26}
-                color={COLORS.primary}
-              />
-            </TouchableOpacity>
+            <View style={styles.headerIcons}>
+              <TouchableOpacity onPress={() => router.push("/(main)/(discover)/filters")}>
+                <Ionicons
+                  name="options-outline"
+                  size={26}
+                  color={hasActiveFilters ? COLORS.primary : COLORS.textSecondary}
+                />
+                {hasActiveFilters && (
+                  <View style={styles.filterBadge} />
+                )}
+              </TouchableOpacity>
+            </View>
           ),
-          headerBottom: () => <HeaderProgressBar />,
           headerShadowVisible: false,
           headerShown: true,
         }}
@@ -116,5 +164,14 @@ const styles = StyleSheet.create({
     width: "40%",
     backgroundColor: COLORS.primary,
     borderRadius: 2,
+  },
+  filterBadge: {
+    position: "absolute",
+    top: 2,
+    right: 2,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: COLORS.primary,
   },
 });

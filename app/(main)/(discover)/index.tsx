@@ -12,7 +12,7 @@ import {
 import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
 import { StatusBar } from "expo-status-bar";
-import { MaterialIcons } from "@expo/vector-icons";
+import { MaterialIcons, Ionicons, FontAwesome5, MaterialCommunityIcons } from "@expo/vector-icons";
 import { discoveryService } from "../../../services/discoveryService";
 
 const COLORS = {
@@ -24,6 +24,10 @@ const COLORS = {
   error: "#e74c3c",
   success: "#27ae60",
   overlay: "rgba(0,0,0,0.55)",
+  maleBlue: "#4A90E2",
+  femalePink: "#FF6B9D",
+  nonbinaryPurple: "#9B59B6",
+  gold: "#FFD700",
 };
 
 const SCREEN_WIDTH = Dimensions.get("window").width;
@@ -41,6 +45,7 @@ type Profile = {
   _id: string;
   name: string;
   age?: number;
+  gender?: string;
   pronouns?: string;
   occupation?: string;
   bio?: string;
@@ -78,6 +83,97 @@ const getProfileImage = (profile: Profile): string => {
   return fallback || PLACEHOLDER_IMAGE;
 };
 
+// Gender Icon Component with animation
+const GenderIcon = ({ gender }: { gender?: string }) => {
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+  const rotateAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    // Pulsing animation
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(scaleAnim, {
+          toValue: 1.2,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(scaleAnim, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+
+    // Rotation animation
+    Animated.loop(
+      Animated.timing(rotateAnim, {
+        toValue: 1,
+        duration: 3000,
+        useNativeDriver: true,
+      })
+    ).start();
+  }, [scaleAnim, rotateAnim]);
+
+  const rotate = rotateAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg'],
+  });
+
+  const getGenderConfig = () => {
+    switch (gender?.toLowerCase()) {
+      case 'male':
+        return {
+          icon: <FontAwesome5 name="mars" size={20} color={COLORS.white} />,
+          colors: ['#4A90E2', '#2E5C8A'] as const,
+          label: 'Male',
+        };
+      case 'female':
+        return {
+          icon: <FontAwesome5 name="venus" size={20} color={COLORS.white} />,
+          colors: ['#FF6B9D', '#E91E63'] as const,
+          label: 'Female',
+        };
+      case 'nonbinary':
+      case 'non-binary':
+      case 'other':
+        return {
+          icon: <MaterialCommunityIcons name="gender-non-binary" size={20} color={COLORS.white} />,
+          colors: ['#9B59B6', '#7D3C98'] as const,
+          label: 'Non-binary',
+        };
+      default:
+        return {
+          icon: <MaterialCommunityIcons name="gender-transgender" size={20} color={COLORS.white} />,
+          colors: ['#9B59B6', '#7D3C98'] as const,
+          label: 'Other',
+        };
+    }
+  };
+
+  const config = getGenderConfig();
+
+  return (
+    <Animated.View
+      style={[
+        styles.genderIconContainer,
+        {
+          transform: [{ scale: scaleAnim }, { rotate }],
+        },
+      ]}
+    >
+      <LinearGradient
+        colors={config.colors}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.genderIconGradient}
+      >
+        {config.icon}
+      </LinearGradient>
+    </Animated.View>
+  );
+};
+
 const parseErrorMessage = (err: unknown, fallback: string) => {
   if (typeof err === "object" && err && "message" in err) {
     return String((err as any).message || fallback);
@@ -98,16 +194,41 @@ const ProfileCard = React.memo<{
   superScale?: any;
 }>(({ profile, index, isCurrent, panHandlers, animatedStyle }) => {
   const imageUri = getProfileImage(profile);
+  const shimmerAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (isCurrent) {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(shimmerAnim, {
+            toValue: 1,
+            duration: 2000,
+            useNativeDriver: true,
+          }),
+          Animated.timing(shimmerAnim, {
+            toValue: 0,
+            duration: 2000,
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
+    }
+  }, [isCurrent, shimmerAnim]);
+
+  const shimmerTranslate = shimmerAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-200, 200],
+  });
   
   return (
     <Animated.View
       style={[
         styles.card,
         animatedStyle,
-        isCurrent && { zIndex: 3, elevation: 6 },
+        isCurrent && { zIndex: 3, elevation: 8 },
         !isCurrent && {
           zIndex: index === 1 ? 2 : 1,
-          elevation: index === 1 ? 4 : 2,
+          elevation: index === 1 ? 5 : 3,
           top: 12 * index,
           transform: [{ scale: index === 1 ? 0.97 : 0.94 }],
           opacity: index === 1 ? 0.95 : 0.9,
@@ -122,6 +243,23 @@ const ProfileCard = React.memo<{
         imageStyle={styles.imageRadius}
         blurRadius={isCurrent ? 0 : index === 1 ? 3 : 5}
       >
+        {isCurrent && (
+          <Animated.View
+            style={[
+              styles.shimmerOverlay,
+              {
+                transform: [{ translateX: shimmerTranslate }],
+              },
+            ]}
+          >
+            <LinearGradient
+              colors={['transparent', 'rgba(255,255,255,0.3)', 'transparent']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={{ width: 100, height: '100%' }}
+            />
+          </Animated.View>
+        )}
         {isCurrent ? (
           <View pointerEvents="none" style={styles.overlayContainer}>
             <Animated.View
@@ -144,37 +282,73 @@ const ProfileCard = React.memo<{
             </Animated.View>
           </View>
         ) : null}
-        <LinearGradient colors={["transparent", COLORS.overlay]} style={styles.gradient}>
+        <LinearGradient 
+          colors={[
+            "transparent", 
+            "rgba(0,0,0,0.3)",
+            "rgba(0,0,0,0.7)",
+            "rgba(0,0,0,0.9)"
+          ]} 
+          style={styles.gradient}
+        >
           <View style={styles.infoContainer}>
             <View style={styles.nameRow}>
+              <GenderIcon gender={profile.gender} />
               <Text style={styles.nameText}>
                 {profile.name}
                 {profile.age ? `, ${profile.age}` : ""}
               </Text>
               {profile.verified && (
-                <MaterialIcons
-                  name="check-circle"
-                  size={22}
-                  color={COLORS.blueCheck}
-                  style={{ marginLeft: 6 }}
-                />
+                <Animated.View
+                  style={{
+                    transform: [{ scale: shimmerAnim.interpolate({
+                      inputRange: [0, 0.5, 1],
+                      outputRange: [1, 1.2, 1],
+                    })}],
+                  }}
+                >
+                  <MaterialIcons
+                    name="check-circle"
+                    size={22}
+                    color={COLORS.blueCheck}
+                    style={{ marginLeft: 6 }}
+                  />
+                </Animated.View>
               )}
             </View>
             <View style={styles.badgeRow}>
               {profile.pronouns && (
-                <View style={[styles.pill, styles.pronounPill]}>
+                <LinearGradient
+                  colors={['rgba(178, 30, 70, 0.9)', 'rgba(230, 57, 109, 0.9)']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={[styles.pill, styles.pronounPill]}
+                >
+                  <Ionicons name="person" size={12} color={COLORS.white} style={{ marginRight: 4 }} />
                   <Text style={styles.pronounPillText}>{profile.pronouns}</Text>
-                </View>
+                </LinearGradient>
               )}
               {profile.occupation && (
-                <View style={styles.pill}>
+                <LinearGradient
+                  colors={['rgba(255, 255, 255, 0.25)', 'rgba(255, 255, 255, 0.15)']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.pill}
+                >
+                  <Ionicons name="briefcase" size={12} color={COLORS.white} style={{ marginRight: 4 }} />
                   <Text style={styles.pillText}>{profile.occupation}</Text>
-                </View>
+                </LinearGradient>
               )}
               {profile.distance !== undefined && (
-                <View style={styles.pill}>
-                  <Text style={styles.pillText}>{profile.distance} km away</Text>
-                </View>
+                <LinearGradient
+                  colors={['rgba(255, 215, 0, 0.3)', 'rgba(255, 165, 0, 0.3)']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.pill}
+                >
+                  <Ionicons name="location" size={12} color={COLORS.gold} style={{ marginRight: 4 }} />
+                  <Text style={[styles.pillText, { color: COLORS.gold }]}>{profile.distance} km away</Text>
+                </LinearGradient>
               )}
             </View>
             {profile.bio ? (
@@ -237,9 +411,37 @@ export default function DiscoverScreen() {
     swipingRef.current = swiping;
   }, [swiping]);
 
-  // Fetch profiles only once
+  // Fetch profiles on mount
   useEffect(() => {
     fetchProfiles();
+  }, []);
+
+  // Listen for filter events
+  useEffect(() => {
+    const handleFiltersApplied = () => {
+      console.log('🔄 Filters applied, reloading profiles...');
+      fetchProfiles(true);
+    };
+
+    const handleFiltersCleared = () => {
+      console.log('🔄 Filters cleared, reloading all profiles...');
+      fetchProfiles(true);
+    };
+
+    const handleRefreshRequested = () => {
+      console.log('🔄 Refresh requested, reloading profiles...');
+      fetchProfiles(true);
+    };
+
+    discoveryService.on('filtersApplied', handleFiltersApplied);
+    discoveryService.on('filtersCleared', handleFiltersCleared);
+    discoveryService.on('refreshRequested', handleRefreshRequested);
+
+    return () => {
+      discoveryService.off('filtersApplied', handleFiltersApplied);
+      discoveryService.off('filtersCleared', handleFiltersCleared);
+      discoveryService.off('refreshRequested', handleRefreshRequested);
+    };
   }, []);
 
   // DEBUG: Detect unexpected profile changes (allow expected shift after swipe)
@@ -316,7 +518,8 @@ export default function DiscoverScreen() {
     setScreenError("");
     setToast(null);
     try {
-      const response: ProfilesApiResponse = await discoveryService.getProfiles(25);
+      // Get profiles with active filters
+      const response: ProfilesApiResponse = await discoveryService.getProfiles(25, discoveryService.activeFilters);
       const nextProfiles = response?.data?.profiles || [];
       
       // LOG: Kiểm tra profiles từ API
@@ -542,7 +745,10 @@ export default function DiscoverScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <LinearGradient
+      colors={['#ffffff', '#fef5f7', '#fef9fa']}
+      style={styles.container}
+    >
       <StatusBar style="light" />
       {renderContent()}
       {toast ? (
@@ -567,15 +773,39 @@ export default function DiscoverScreen() {
           </Text>
         </View>
       ) : null}
-    </View>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.white,
     padding: 16,
+  },
+  genderIconContainer: {
+    marginRight: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  genderIconGradient: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: COLORS.white,
+  },
+  shimmerOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 1,
   },
   overlayContainer: {
     position: "absolute",
@@ -641,11 +871,13 @@ const styles = StyleSheet.create({
     width: "100%",
     height: "90%",
     borderRadius: 24,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.2,
-    shadowRadius: 12,
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
     overflow: "hidden",
+    borderWidth: 3,
+    borderColor: COLORS.white,
   },
   imageBackground: {
     flex: 1,
@@ -664,6 +896,7 @@ const styles = StyleSheet.create({
   nameRow: {
     flexDirection: "row",
     alignItems: "center",
+    marginBottom: 4,
   },
   nameText: {
     fontSize: 30,
@@ -679,23 +912,31 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   pill: {
-    backgroundColor: "rgba(255, 255, 255, 0.22)",
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 20,
     marginRight: 8,
     marginBottom: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 3,
   },
   pillText: {
     color: COLORS.white,
-    fontWeight: "500",
+    fontWeight: "600",
+    fontSize: 13,
   },
   pronounPill: {
-    backgroundColor: COLORS.secondary,
+    // Gradient applied via LinearGradient component
   },
   pronounPillText: {
-    color: COLORS.primary,
+    color: COLORS.white,
     fontWeight: "700",
+    fontSize: 13,
   },
   bioText: {
     color: COLORS.white,
