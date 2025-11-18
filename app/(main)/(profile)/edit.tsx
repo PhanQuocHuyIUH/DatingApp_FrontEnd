@@ -954,6 +954,8 @@ export default function EditProfileScreen() {
           </View>
         </View>
 
+        
+
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Linked accounts</Text>
 
@@ -1044,6 +1046,8 @@ export default function EditProfileScreen() {
     </>
   );
 }
+
+
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.lightGray, paddingHorizontal: 20 },
