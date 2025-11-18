@@ -245,8 +245,18 @@ export default function MatchesScreen() {
         const res = await chatService.createConversation(item.id);
         const conv = res?.data?.conversation || res?.conversation || res?.data;
         if (conv?.id) {
-          const other = conv.participants?.find?.((p:any)=> p._id !== item.user.id);
-          router.push({ pathname: '/(main)/(messages)/[chatId]', params: { chatId: String(conv.id), matchId: String(item.id), userId: other?._id || '' } });
+          router.push({ 
+            pathname: '/(main)/(messages)/[chatId]', 
+            params: { 
+              chatId: String(conv.id), 
+              matchId: String(item.id), 
+              userId: String(item.user.id),
+              userName: item.user.name,
+              userAge: String(item.user.age || ''),
+              avatar: img,
+              isSuperLike: String(isSuperLike),
+            } 
+          });
         }
       } catch {
         // noop; could show toast

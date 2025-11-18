@@ -54,7 +54,17 @@ type Conversation = {
 
 // --- Component cho Hàng Chat với SuperLike ---
 const ChatRow = ({ item }: { item: Conversation }) => {
-  const avatar = (item.user.photos?.find(p => p.isMain && p.url)?.url) || item.user.photos?.[0]?.url;
+  // Extract avatar with proper fallback logic
+  const getAvatar = () => {
+    if (!item.user.photos || item.user.photos.length === 0) {
+      return 'https://via.placeholder.com/150';
+    }
+    const mainPhoto = item.user.photos.find(p => p.isMain && p.url);
+    if (mainPhoto?.url) return mainPhoto.url;
+    const firstPhoto = item.user.photos.find(p => p.url);
+    return firstPhoto?.url || 'https://via.placeholder.com/150';
+  };
+  const avatar = getAvatar();
   const statusColor = item.user.isOnline ? COLORS.online : COLORS.offline;
   const lastText = item.lastMessage?.text || '';
   const isSuperLike = item.isSuperLike;
@@ -108,12 +118,12 @@ const ChatRow = ({ item }: { item: Conversation }) => {
       href={{
         pathname: '/(main)/(messages)/[chatId]',
         params: {
-          chatId: item.id,
-          matchId: item.matchId,
-          userName: item.user.name,
-          userAge: item.user.age?.toString() || '',
-          avatar: avatar || '',
-          userId: item.user.id,
+          chatId: String(item.id),
+          matchId: String(item.matchId),
+          userName: item.user.name || 'User',
+          userAge: String(item.user.age || ''),
+          avatar: avatar,
+          userId: String(item.user.id),
           isSuperLike: isSuperLike ? 'true' : 'false',
         },
       }}
@@ -309,6 +319,16 @@ export default function MessagesScreen() {
             // reorder by lastMessage timestamp desc
             return [...updated].sort((a,b) => new Date(b.lastMessage?.timestamp || 0).getTime() - new Date(a.lastMessage?.timestamp || 0).getTime());
           });
+        });
+        
+        // Listen for read receipts to clear unread badge
+        socketService.onReadReceipt((data: any) => {
+          const { conversationId } = data || {};
+          if (conversationId) {
+            setConvs(prev => prev.map(c => 
+              c.id === conversationId ? { ...c, unreadCount: 0 } : c
+            ));
+          }
         });
       } catch {
         // ignore socket connect errors

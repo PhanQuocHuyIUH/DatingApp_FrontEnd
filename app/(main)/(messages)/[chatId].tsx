@@ -183,10 +183,29 @@ export default function ChatScreen() {
             return;
           }
           
-          console.log('✅ Adding message to UI:', msg);
-          // Avoid duplicate (check if already exists)
+          console.log('✅ Processing message:', msg);
           if (!mounted) return;
+          
           setMessages(prev => {
+            // Check if sender is current user (this is our sent message)
+            const msgSenderId = msg.sender?._id || msg.sender?.id || msg.sender;
+            if (msgSenderId === currentUserId) {
+              console.log('📤 This is our sent message, replacing optimistic');
+              // Replace optimistic message with real one
+              const hasOptimistic = prev.some(m => m._id?.toString().startsWith('optimistic-'));
+              if (hasOptimistic) {
+                return prev.map(m => 
+                  m._id?.toString().startsWith('optimistic-') ? msg : m
+                );
+              }
+              // If no optimistic (e.g. sent from another device), check duplicate
+              const exists = prev.find(m => (m._id || m.id) === (msg._id || msg.id));
+              if (exists) return prev;
+              return [...prev, msg];
+            }
+            
+            // Message from other user - check duplicate and add
+            console.log('📥 Message from other user');
             const exists = prev.find(m => (m._id || m.id) === (msg._id || msg.id));
             if (exists) {
               console.log('⚠️ Duplicate message, skipping');
@@ -207,6 +226,24 @@ export default function ChatScreen() {
             if (mounted) setTyping(data.isTyping);
           }
         });
+        
+        socketService.onReadReceipt((data:any) => {
+          console.log('📖 Read receipt received:', data);
+          if (data?.conversationId === chatId) {
+            // Update messages read status if needed
+            setMessages(prev => prev.map(m => {
+              if (m._id === data.messageId) {
+                return { ...m, isRead: true };
+              }
+              return m;
+            }));
+          }
+        });
+        
+        // Mark conversation as entered (clear unread on backend)
+        if (chatId) {
+          socketService.emitRead({ conversationId: String(chatId) });
+        }
       } catch (err) {
         console.error('❌ Socket setup error:', err);
       }
@@ -249,6 +286,8 @@ export default function ChatScreen() {
       {/* --- Cấu hình Header --- */}
       <Stack.Screen
         options={{
+          headerShown: true,
+          headerBackVisible: true,
           headerTitle: () => (
             // Header Title tùy chỉnh
             <View style={styles.headerTitleContainer}>
@@ -349,6 +388,10 @@ export default function ChatScreen() {
             onPress={async () => {
               if (!message.trim() || !matchId) return;
               const textToSend = message.trim();
+              // Stop typing indicator
+              if (chatId && userId) {
+                socketService.stopTyping({ conversationId: String(chatId), receiverId: String(userId) });
+              }
               const optimistic: ChatMessage = { _id: `optimistic-${Date.now()}`, sender: { _id: currentUserId }, text: textToSend, createdAt: new Date().toISOString() };
               setMessages(prev => [...prev, optimistic]);
               requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: true }));
