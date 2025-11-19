@@ -8,11 +8,12 @@ import {
   Switch,
   Animated,
   ActivityIndicator,
-  Modal,            // Mới
-  TextInput,        // Mới
-  FlatList,         // Mới
-  Keyboard,         // Mới
-  TouchableWithoutFeedback // Mới
+  Modal,
+  TextInput,
+  FlatList,
+  Keyboard,
+  TouchableWithoutFeedback,
+  Platform,
 } from "react-native";
 import { router } from "expo-router";
 import {
@@ -23,58 +24,68 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import MultiSlider from "@ptomasroos/react-native-multi-slider";
 import { discoveryService } from '../../../services/discoveryService';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-// --- Bảng màu ---
+// --- Bảng màu Hiện đại ---
 const COLORS = {
-  primary: "#b21e46",
-  secondary: "#fae0e7",
-  text: "#1F2937",
+  primary: "#E94057", // Đỏ hồng hiện đại
+  primaryLight: "#F27121", // Cam nhẹ (cho gradient)
+  text: "#111827",
   textSecondary: "#6B7280",
   white: "#FFFFFF",
-  lightGray: "#F3F4F6",
-  gray: "#E5E7EB",
-  backdrop: "rgba(0,0,0,0.5)", // Màu nền tối cho Modal
+  lightGray: "#F3F4F6", // Nền nhẹ
+  gray: "#E5E7EB", // Border
+  backdrop: "rgba(0,0,0,0.4)",
+  activePill: "#FCE8EC", // Màu nền nhẹ cho pill
 };
 
-// --- Dữ liệu mẫu (Thực tế có thể lấy từ API) ---
+// --- Dữ liệu mẫu ---
 const AVAILABLE_LANGUAGES = [
-  "Vietnamese", "English", "Spanish", "French", "German", 
-  "Japanese", "Korean", "Chinese", "Russian", "Italian", 
+  "Vietnamese", "English", "Spanish", "French", "German",
+  "Japanese", "Korean", "Chinese", "Russian", "Italian",
   "Portuguese", "Thai", "Indonesian"
 ];
 
-// --- Component Checkbox Row ---
-type CheckboxRowProps = {
+// --- Component Header Tùy chỉnh ---
+const CustomHeader = ({ onClear, onBack, loading }: { onClear: () => void, onBack: () => void, loading: boolean }) => (
+  <View style={headerStyles.headerContainer}>
+    <TouchableOpacity onPress={onBack} style={headerStyles.iconButton}>
+      <Ionicons name="close-outline" size={30} color={COLORS.text} />
+    </TouchableOpacity>
+    <Text style={headerStyles.headerTitle}>Discovery Filters</Text>
+    <TouchableOpacity onPress={onClear} disabled={loading} style={headerStyles.clearButton}>
+      <Text style={headerStyles.clearButtonText}>Clear All</Text>
+    </TouchableOpacity>
+  </View>
+);
+
+// --- Component Tùy chọn Giới tính (Biến Checkbox thành Pill) ---
+type GenderPillProps = {
   label: string;
+  icon: string;
   checked: boolean;
   onToggle: () => void;
 };
-const CheckboxRow: React.FC<CheckboxRowProps> = ({ label, checked, onToggle }) => {
-  const scaleAnim = useRef(new Animated.Value(1)).current;
-
-  const handlePress = () => {
-    Animated.sequence([
-      Animated.timing(scaleAnim, { toValue: 0.95, duration: 100, useNativeDriver: true }),
-      Animated.spring(scaleAnim, { toValue: 1, friction: 3, tension: 40, useNativeDriver: true }),
-    ]).start();
-    onToggle();
-  };
-
+const GenderPill: React.FC<GenderPillProps> = ({ label, icon, checked, onToggle }) => {
   return (
-    <TouchableOpacity style={styles.checkboxRow} onPress={handlePress} activeOpacity={0.7}>
-      <Text style={[styles.checkboxLabel, checked && { color: COLORS.primary, fontWeight: '600' }]}>
+    <TouchableOpacity 
+      style={[styles.genderPill, checked ? styles.genderPillActive : styles.genderPillInactive]} 
+      onPress={onToggle}
+      activeOpacity={0.8}
+    >
+      <MaterialCommunityIcons 
+        name={icon as any} 
+        size={20} 
+        color={checked ? COLORS.white : COLORS.textSecondary} 
+        style={{ marginRight: 6 }}
+      />
+      <Text style={[styles.genderPillText, checked ? styles.genderPillTextActive : styles.genderPillTextInactive]}>
         {label}
       </Text>
-      <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
-        <MaterialCommunityIcons
-          name={checked ? "checkbox-marked" : "checkbox-blank-outline"}
-          size={24}
-          color={checked ? COLORS.primary : COLORS.gray}
-        />
-      </Animated.View>
     </TouchableOpacity>
   );
 };
+
 
 // --- Component Pill Ngôn ngữ ---
 const LanguagePill = ({ label, onRemove }: { label: string; onRemove: () => void }) => {
@@ -90,28 +101,24 @@ const LanguagePill = ({ label, onRemove }: { label: string; onRemove: () => void
 
   return (
     <Animated.View style={[styles.pill, { transform: [{ scale: scaleAnim }] }]}>
-      <LinearGradient
-        colors={[COLORS.secondary, '#fce9ed']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
-        style={styles.pillGradient}
-      >
+      <View style={styles.pillContent}>
         <Text style={styles.pillText}>{label}</Text>
         <TouchableOpacity onPress={handleRemove} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
           <Feather name="x" size={14} color={COLORS.primary} />
         </TouchableOpacity>
-      </LinearGradient>
+      </View>
     </Animated.View>
   );
 };
 
 // --- Màn hình chính ---
 export default function FiltersScreen() {
-  const [genders, setGenders] = useState({ male: false, female: true, nonbinary: false });
+  const insets = useSafeAreaInsets();
+  const [genders, setGenders] = useState({ male: true, female: true, nonbinary: false });
   const [ageRange, setAgeRange] = useState([18, 80]);
   const [distance, setDistance] = useState([10]);
   const [expandRange, setExpandRange] = useState(true);
-  const [languages, setLanguages] = useState<string[]>(["English", "Vietnamese"]); // Mặc định có tiếng Việt
+  const [languages, setLanguages] = useState<string[]>(["English", "Vietnamese"]);
   const [loading, setLoading] = useState(false);
 
   // --- State cho Modal Language ---
@@ -142,13 +149,12 @@ export default function FiltersScreen() {
     if (!languages.includes(langToAdd)) {
       setLanguages(prev => [...prev, langToAdd]);
     }
-    // Không đóng modal ngay để user chọn nhiều cái
   };
 
   const isLanguageSelected = (lang: string) => languages.includes(lang);
 
   const filteredLanguages = useMemo(() => {
-    return AVAILABLE_LANGUAGES.filter(lang => 
+    return AVAILABLE_LANGUAGES.filter(lang =>
       lang.toLowerCase().includes(searchText.toLowerCase())
     );
   }, [searchText]);
@@ -167,7 +173,7 @@ export default function FiltersScreen() {
     try {
       const selectedGenders = Object.keys(genders).filter((key) => genders[key as keyof typeof genders]);
       const filters: any = { ageMin: ageRange[0], ageMax: ageRange[1] };
-      if (selectedGenders.length === 1) filters.gender = selectedGenders[0];
+      if (selectedGenders.length >= 1) filters.gender = selectedGenders.join(','); // Cho phép chọn nhiều
       if (distance[0]) filters.distance = distance[0];
       if (languages.length > 0) filters.languages = languages.join(',');
 
@@ -183,22 +189,30 @@ export default function FiltersScreen() {
 
   return (
     <View style={styles.container}>
-      <LinearGradient colors={['#ffffff', '#fef5f7', '#fef9fa']} style={styles.gradientBackground}>
+      <CustomHeader 
+        onClear={handleClearAll} 
+        onBack={() => router.back()} 
+        loading={loading}
+      />
+      
+      <LinearGradient colors={[COLORS.white, COLORS.lightGray]} style={styles.gradientBackground}>
         <Animated.View style={[styles.animatedContainer, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
-          <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+          <ScrollView 
+            style={styles.scrollView} 
+            contentContainerStyle={styles.scrollContent} 
+            showsVerticalScrollIndicator={false}
+          >
             
-            {/* 1. Gender */}
+            {/* 1. Gender (CẢI TIẾN THÀNH PILL) */}
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
                 <MaterialCommunityIcons name="gender-male-female" size={20} color={COLORS.primary} />
-                <Text style={styles.sectionTitle}>Preferred gender?</Text>
+                <Text style={styles.sectionTitle}>I'm interested in:</Text>
               </View>
-              <View style={styles.card}>
-                <CheckboxRow label="Male" checked={genders.male} onToggle={() => toggleGender("male")} />
-                <View style={styles.divider} />
-                <CheckboxRow label="Female" checked={genders.female} onToggle={() => toggleGender("female")} />
-                <View style={styles.divider} />
-                <CheckboxRow label="Nonbinary" checked={genders.nonbinary} onToggle={() => toggleGender("nonbinary")} />
+              <View style={styles.genderPillContainer}>
+                <GenderPill label="Men" icon="gender-male" checked={genders.male} onToggle={() => toggleGender("male")} />
+                <GenderPill label="Women" icon="gender-female" checked={genders.female} onToggle={() => toggleGender("female")} />
+                <GenderPill label="Nonbinary" icon="gender-transgender" checked={genders.nonbinary} onToggle={() => toggleGender("nonbinary")} />
               </View>
             </View>
 
@@ -211,7 +225,7 @@ export default function FiltersScreen() {
               <View style={[styles.card, styles.sliderCard]}>
                 <View style={styles.sliderLabels}>
                   <Text style={styles.sliderLabelText}>{ageRange[0]}</Text>
-                  <Text style={styles.sliderLabelText}>{ageRange[1]}</Text>
+                  <Text style={styles.sliderLabelText}>{ageRange[1]} {ageRange[1] === 80 ? '+' : ''}</Text>
                 </View>
                 <MultiSlider
                   values={[ageRange[0], ageRange[1]]}
@@ -229,12 +243,12 @@ export default function FiltersScreen() {
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
                 <Ionicons name="location-outline" size={20} color={COLORS.primary} />
-                <Text style={styles.sectionTitle}>Distance:</Text>
+                <Text style={styles.sectionTitle}>Max Distance:</Text>
               </View>
               <View style={[styles.card, styles.sliderCard]}>
                 <View style={styles.sliderLabels}>
                   <Text style={styles.sliderLabelText}>{distance[0]} km</Text>
-                  <Text style={styles.sliderLabelText}>80 km</Text>
+                  <Text style={styles.sliderLabelText}>80 km {distance[0] === 80 ? '+' : ''}</Text>
                 </View>
                 <MultiSlider
                   values={distance}
@@ -258,7 +272,7 @@ export default function FiltersScreen() {
               </View>
             </View>
 
-            {/* 4. Languages (ĐÃ CẢI THIỆN) */}
+            {/* 4. Languages */}
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
                 <Ionicons name="language-outline" size={20} color={COLORS.primary} />
@@ -274,7 +288,7 @@ export default function FiltersScreen() {
                 }}
               >
                 <Text style={styles.dropdownText}>
-                  {languages.length > 0 ? "Add more languages..." : "Select languages"}
+                  {languages.length > 0 ? `Selected: ${languages.length} languages` : "Select languages"}
                 </Text>
                 <Ionicons name="add-circle-outline" size={24} color={COLORS.primary} />
               </TouchableOpacity>
@@ -289,17 +303,17 @@ export default function FiltersScreen() {
           </ScrollView>
         </Animated.View>
 
-        {/* Footer Buttons */}
-        <View style={styles.footer}>
-          <TouchableOpacity style={styles.clearButton} onPress={handleClearAll} disabled={loading}>
-            <Ionicons name="refresh-outline" size={20} color={COLORS.textSecondary} />
-            <Text style={styles.clearButtonText}>Clear</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.applyButton, loading && styles.applyButtonDisabled]} onPress={handleApplyFilters} disabled={loading}>
+        {/* Footer Buttons (Chỉ còn nút Apply) */}
+        <View style={[styles.footer, {paddingBottom: 20 + insets.bottom}]}>
+          <TouchableOpacity 
+            style={[styles.applyButton, loading && styles.applyButtonDisabled]} 
+            onPress={handleApplyFilters} 
+            disabled={loading}
+          >
             {loading ? <ActivityIndicator color={COLORS.white} /> : (
               <>
                 <Ionicons name="checkmark-circle" size={20} color={COLORS.white} />
-                <Text style={styles.applyButtonText}>Apply Filters</Text>
+                <Text style={styles.applyButtonText}>Show Matches</Text>
               </>
             )}
           </TouchableOpacity>
@@ -365,7 +379,7 @@ export default function FiltersScreen() {
               }
             />
              <TouchableOpacity style={styles.modalDoneBtn} onPress={() => setModalVisible(false)}>
-                <Text style={styles.modalDoneText}>Done</Text>
+               <Text style={styles.modalDoneText}>Done</Text>
              </TouchableOpacity>
           </View>
         </View>
@@ -375,56 +389,116 @@ export default function FiltersScreen() {
   );
 }
 
+// --- Header Styles ---
+const headerStyles = StyleSheet.create({
+  headerContainer: {
+    paddingTop: Platform.OS === 'ios' ? 50 : 20,
+    paddingHorizontal: 16,
+    paddingBottom: 10,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: COLORS.white,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.gray,
+  },
+  iconButton: {
+    padding: 4,
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: COLORS.text,
+  },
+  clearButton: {
+    padding: 8,
+  },
+  clearButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.textSecondary,
+  },
+});
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.white },
   gradientBackground: { flex: 1 },
   animatedContainer: { flex: 1 },
   scrollView: { flex: 1 },
   scrollContent: { padding: 20, paddingBottom: 120 },
-  section: { marginBottom: 24 },
-  sectionHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
-  sectionTitle: { fontSize: 16, fontWeight: "600", color: COLORS.primary, marginLeft: 8 },
+  section: { marginBottom: 30 }, // Tăng khoảng cách giữa các phần
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 }, // Tăng khoảng cách
+  sectionTitle: { fontSize: 18, fontWeight: "700", color: COLORS.text, marginLeft: 8 }, // Màu chữ đậm và to hơn
   card: {
     backgroundColor: COLORS.white,
     borderRadius: 16,
-    borderWidth: 1,
-    borderColor: COLORS.gray,
-    shadowColor: '#b21e46',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
+    // Bỏ border và dùng shadow nhẹ
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 5,
   },
-  // Checkbox
-  checkboxRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 16, paddingHorizontal: 16 },
-  checkboxLabel: { fontSize: 16, color: COLORS.text },
-  divider: { height: 1, backgroundColor: COLORS.gray, marginHorizontal: 16 },
+  
+  // --- Gender Pills (Thay thế Checkbox) ---
+  genderPillContainer: { flexDirection: 'row', flexWrap: 'wrap', marginHorizontal: -4 },
+  genderPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 30,
+    margin: 4,
+    borderWidth: 1,
+  },
+  genderPillActive: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+  },
+  genderPillInactive: {
+    backgroundColor: COLORS.white,
+    borderColor: COLORS.gray,
+  },
+  genderPillText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  genderPillTextActive: {
+    color: COLORS.white,
+  },
+  genderPillTextInactive: {
+    color: COLORS.textSecondary,
+  },
+
   // Sliders
   sliderCard: { padding: 16 },
   sliderLabels: { flexDirection: "row", justifyContent: "space-between", marginBottom: 12 },
-  sliderLabelText: { fontSize: 16, fontWeight: "600", color: COLORS.text },
-  markerStyle: { backgroundColor: COLORS.white, borderColor: COLORS.primary, borderWidth: 2, height: 24, width: 24 },
+  sliderLabelText: { fontSize: 18, fontWeight: "700", color: COLORS.primary }, // Màu sắc nổi bật hơn
+  markerStyle: { backgroundColor: COLORS.white, borderColor: COLORS.primary, borderWidth: 3, height: 26, width: 26, borderRadius: 13, shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 3, elevation: 4 },
+  
   // Toggle
+  divider: { height: 1, backgroundColor: COLORS.lightGray, marginHorizontal: 0, marginTop: 16 },
   toggleRow: { flexDirection: "row", alignItems: "center", paddingTop: 16 },
   toggleLabel: { flex: 1, fontSize: 14, color: COLORS.textSecondary, marginRight: 12 },
+  
   // Languages
   dropdown: {
-    flexDirection: "row", alignItems: "center", backgroundColor: COLORS.white, 
-    padding: 16, borderRadius: 12, borderWidth: 1, borderColor: COLORS.primary,
-    borderStyle: 'dashed' // Tạo kiểu nút thêm mới
+    flexDirection: "row", alignItems: "center", backgroundColor: COLORS.activePill,
+    padding: 16, borderRadius: 12, borderWidth: 1, borderColor: COLORS.gray,
   },
-  dropdownText: { flex: 1, fontSize: 16, color: COLORS.primary, fontWeight: '500' },
+  dropdownText: { flex: 1, fontSize: 16, color: COLORS.primary, fontWeight: '600' },
   pillContainer: { flexDirection: "row", flexWrap: "wrap", marginTop: 12 },
-  pill: { marginRight: 8, marginBottom: 8, borderRadius: 20, overflow: 'hidden', elevation: 2 },
-  pillGradient: { flexDirection: "row", alignItems: "center", paddingVertical: 6, paddingHorizontal: 12 },
+  pill: { marginRight: 8, marginBottom: 8, borderRadius: 20, overflow: 'hidden', elevation: 2, borderWidth: 1, borderColor: COLORS.gray },
+  pillContent: { flexDirection: "row", alignItems: "center", paddingVertical: 6, paddingHorizontal: 12, backgroundColor: COLORS.activePill },
   pillText: { fontSize: 14, color: COLORS.primary, fontWeight: "600", marginRight: 6 },
+  
   // Footer
-  footer: { position: "absolute", bottom: 0, left: 0, right: 0, flexDirection: "row", backgroundColor: COLORS.white, borderTopWidth: 1, borderTopColor: COLORS.gray, padding: 20, paddingBottom: 30 },
-  clearButton: { flex: 0.4, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.lightGray, paddingVertical: 16, borderRadius: 30, marginRight: 10 },
-  clearButtonText: { fontSize: 16, fontWeight: "700", color: COLORS.textSecondary, marginLeft: 6 },
-  applyButton: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.primary, paddingVertical: 16, borderRadius: 30, marginLeft: 10, elevation: 5 },
-  applyButtonDisabled: { opacity: 0.6 },
-  applyButtonText: { fontSize: 16, fontWeight: "700", color: COLORS.white, marginLeft: 6 },
+  footer: { position: "absolute", bottom: 0, left: 0, right: 0, flexDirection: "row", backgroundColor: COLORS.white, borderTopWidth: 1, borderTopColor: COLORS.gray, paddingHorizontal: 20, paddingTop: 15, elevation: 10 },
+  applyButton: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.primary, paddingVertical: 18, borderRadius: 30, elevation: 8,
+    shadowColor: COLORS.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 5,
+  },
+  applyButtonDisabled: { opacity: 0.7 },
+  applyButtonText: { fontSize: 18, fontWeight: "700", color: COLORS.white, marginLeft: 8 }, // To và đậm hơn
   
   // --- Modal Styles ---
   modalOverlay: { flex: 1, justifyContent: 'flex-end' },
@@ -433,12 +507,11 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    height: '70%', // Chiếm 70% màn hình
+    height: '75%', // Chiếm 75% màn hình
     padding: 20,
-    paddingBottom: 40,
   },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-  modalTitle: { fontSize: 20, fontWeight: '700', color: COLORS.text },
+  modalTitle: { fontSize: 22, fontWeight: '700', color: COLORS.text }, // To hơn
   searchContainer: {
     flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.lightGray,
     paddingHorizontal: 12, paddingVertical: 12, borderRadius: 12, marginBottom: 16
@@ -449,10 +522,10 @@ const styles = StyleSheet.create({
     paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: COLORS.lightGray
   },
   modalItemText: { fontSize: 16, color: COLORS.text },
-  modalItemTextSelected: { color: COLORS.primary, fontWeight: '600' },
+  modalItemTextSelected: { color: COLORS.primary, fontWeight: '700' },
   emptyText: { textAlign: 'center', color: COLORS.textSecondary, marginTop: 20 },
   modalDoneBtn: {
-    marginTop: 10, backgroundColor: COLORS.primary, padding: 16, borderRadius: 12, alignItems: 'center'
+    marginTop: 20, backgroundColor: COLORS.primary, padding: 18, borderRadius: 12, alignItems: 'center'
   },
-  modalDoneText: { color: COLORS.white, fontWeight: '700', fontSize: 16 }
+  modalDoneText: { color: COLORS.white, fontWeight: '700', fontSize: 18 }
 });
