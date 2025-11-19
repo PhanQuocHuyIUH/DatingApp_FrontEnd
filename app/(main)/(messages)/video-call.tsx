@@ -7,22 +7,29 @@ import {
   TouchableOpacity,
   Image,
   Platform,
+  Dimensions,
 } from "react-native";
 import { Stack, router, useLocalSearchParams } from "expo-router";
 import {
   Feather,
   Ionicons,
   MaterialCommunityIcons,
+  MaterialIcons, // Thêm MaterialIcons
 } from "@expo/vector-icons";
 import { StatusBar } from "expo-status-bar";
+// Có thể thêm import { BlurView } from 'expo-blur'; nếu muốn nút điều khiển trong suốt mờ
 
-// --- Bảng màu ---
+const { width, height } = Dimensions.get('window');
+
+// --- Bảng màu Cải tiến ---
 const COLORS = {
-  primary: "#b21e46", // Đỏ đô
-  secondary: "#fae0e7", // Hồng nhạt
+  primary: "#E94057", // Đỏ hồng hiện đại
+  endCall: "#FF3B30", // Đỏ tươi cho nút kết thúc
   white: "#FFFFFF",
-  textSecondary: "#E5E7EB", // Trắng mờ
-  darkTransparent: "rgba(0, 0, 0, 0.4)", // Nền cho control
+  textSecondary: "#E5E7EB", 
+  darkOverlay: "rgba(0, 0, 0, 0.4)", 
+  lightOverlay: "rgba(255, 255, 255, 0.2)", // Trắng mờ cho control buttons
+  connectedBorder: "#4CD964", // Xanh lá cây
 };
 
 export default function VideoCallScreen() {
@@ -35,9 +42,10 @@ export default function VideoCallScreen() {
   const [callStatus, setCallStatus] = useState<'calling' | 'connected' | 'ended'>('calling');
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoOff, setIsVideoOff] = useState(false);
+  const [isSpeakerOn, setIsSpeakerOn] = useState(true); // Thêm trạng thái loa ngoài
   const [callDuration, setCallDuration] = useState(0);
 
-  // Simulate call connecting after 3 seconds
+  // Giả lập kết nối sau 3 giây
   useEffect(() => {
     const timer = setTimeout(() => {
       setCallStatus('connected');
@@ -45,7 +53,7 @@ export default function VideoCallScreen() {
     return () => clearTimeout(timer);
   }, []);
 
-  // Call duration timer
+  // Bộ đếm thời gian
   useEffect(() => {
     if (callStatus !== 'connected') return;
     const interval = setInterval(() => {
@@ -68,9 +76,13 @@ export default function VideoCallScreen() {
   const user = {
     name: userName || "User",
     age: userAge,
-    profilePhoto: avatar || "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=387&q=80",
-    avatar: avatar || "https://images.unsplash.com/photo-1580489944761-15a19d654956?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%D&auto=format&fit=crop&w=761&q=80",
+    // Dùng cùng một ảnh cho cả Background và Avatar. Thêm ảnh placeholder nếu không có.
+    profilePhoto: avatar || "https://picsum.photos/seed/person1/700/1000",
+    avatar: avatar || "https://picsum.photos/seed/person2/120/120", 
   };
+
+  // Giả lập ảnh Self-View (video của chính mình)
+  const selfVideoUri = "https://picsum.photos/seed/selfie/200/300";
 
   const getStatusText = () => {
     switch (callStatus) {
@@ -81,86 +93,128 @@ export default function VideoCallScreen() {
       case 'ended':
         return 'Call Ended';
       default:
-        return 'Calling...';
+        return 'Connecting...';
     }
   };
+  
+  // --- RENDERING ---
   return (
     <View style={styles.container}>
-      {/* Đổi chữ trên thanh status bar sang màu trắng */}
       <StatusBar style="light" />
-
-      {/* --- Cấu hình Stack (đã làm trong _layout) --- */}
       <Stack.Screen options={{ headerShown: false }} />
 
-      {/* --- Ảnh nền (được làm mờ) --- */}
+      {/* --- Ảnh nền (Video của đối phương) --- */}
       <ImageBackground
         source={{ uri: user.profilePhoto }}
         style={styles.backgroundImage}
-        blurRadius={10} // Độ mờ
+        blurRadius={callStatus === 'calling' ? 10 : 0} // Chỉ làm mờ khi đang gọi
       >
         {/* Lớp phủ làm tối ảnh */}
-        <View style={styles.overlay} />
+        <View style={[styles.overlay, callStatus === 'connected' && { backgroundColor: 'transparent' }]} />
 
-        {/* --- 1. Nút điều khiển trên cùng --- */}
-        <View style={styles.topControls}>
-          <TouchableOpacity onPress={() => router.back()}>
-            <Feather name="chevron-down" size={28} color={COLORS.white} />
-          </TouchableOpacity>
-          <TouchableOpacity>
-            <Feather name="more-vertical" size={28} color={COLORS.white} />
-          </TouchableOpacity>
-        </View>
+        {/* Màn hình đen khi Video Off */}
+        {isVideoOff && callStatus === 'connected' && (
+            <View style={styles.videoOffScreen}>
+                <MaterialIcons name="videocam-off" size={60} color={COLORS.lightOverlay} />
+            </View>
+        )}
 
-        {/* --- 2. Thông tin người gọi --- */}
-        <View style={styles.centerContainer}>
-          <View style={[styles.avatarOuter, callStatus === 'connected' && styles.avatarConnected]}>
-            <Image source={{ uri: user.avatar }} style={styles.avatar} />
-            {callStatus === 'connected' && (
-              <View style={styles.connectedBadge}>
-                <MaterialCommunityIcons name="phone" size={16} color={COLORS.white} />
-              </View>
-            )}
+        {/* --- 1. Top Controls (Nút điều khiển trên cùng) và Self-View --- */}
+        <View style={styles.topContainer}>
+          <View style={styles.topControls}>
+            <TouchableOpacity onPress={() => router.back()}>
+              <Feather name="chevron-down" size={28} color={COLORS.white} style={styles.shadowText} />
+            </TouchableOpacity>
+            <TouchableOpacity>
+              <Feather name="more-vertical" size={28} color={COLORS.white} style={styles.shadowText} />
+            </TouchableOpacity>
           </View>
-          <Text style={styles.nameText}>
-            {user.name}{user.age ? `, ${user.age}` : ''}
-          </Text>
-          <Text style={styles.statusText}>{getStatusText()}</Text>
-          {callStatus === 'calling' && (
-            <View style={styles.callingAnimation}>
-              <MaterialCommunityIcons name="phone-ring" size={20} color={COLORS.textSecondary} />
+          
+          {/* --- Self View (Video của chính mình) --- */}
+          {callStatus === 'connected' && (
+            <View style={styles.selfViewContainer}>
+              <Image 
+                source={{ uri: selfVideoUri }} 
+                style={styles.selfViewImage}
+              />
             </View>
           )}
         </View>
 
+        {/* --- 2. Thông tin người gọi (Chỉ hiển thị khi đang Calling) --- */}
+        {callStatus === 'calling' && (
+          <View style={styles.centerContainer}>
+            <View style={styles.avatarOuter}>
+              <Image source={{ uri: user.avatar }} style={styles.avatar} />
+            </View>
+            <Text style={styles.nameText}>
+              {user.name}{user.age ? `, ${user.age}` : ''}
+            </Text>
+            <Text style={styles.statusText}>{getStatusText()}</Text>
+            <View style={styles.callingAnimation}>
+              <MaterialCommunityIcons name="phone-ring" size={20} color={COLORS.textSecondary} />
+            </View>
+          </View>
+        )}
+
+        {/* --- 2B. Thông tin Connected (Thấp hơn một chút) --- */}
+        {callStatus === 'connected' && (
+          <View style={styles.connectedInfo}>
+             <Text style={styles.nameTextSmall}>
+              {user.name}{user.age ? `, ${user.age}` : ''}
+            </Text>
+            <Text style={styles.statusTextConnected}>{getStatusText()}</Text>
+          </View>
+        )}
+
         {/* --- 3. Nút điều khiển dưới cùng --- */}
         <View style={styles.bottomControls}>
-          <TouchableOpacity 
-            style={styles.controlButton}
-            onPress={() => setIsVideoOff(!isVideoOff)}
-          >
-            <MaterialCommunityIcons
-              name={isVideoOff ? "video-off-outline" : "video-outline"}
-              size={30}
-              color={COLORS.white}
-            />
-          </TouchableOpacity>
+          {/* Mute/Unmute */}
           <TouchableOpacity 
             style={[styles.controlButton, isMuted && styles.controlButtonActive]}
             onPress={() => setIsMuted(!isMuted)}
           >
             <Ionicons 
-              name={isMuted ? "mic-off-outline" : "mic-outline"} 
-              size={30} 
+              name={isMuted ? "mic-off" : "mic"} 
+              size={28} 
               color={COLORS.white} 
             />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.controlButton}>
+          
+          {/* Video On/Off */}
+          <TouchableOpacity 
+            style={[styles.controlButton, isVideoOff && styles.controlButtonActive]}
+            onPress={() => setIsVideoOff(!isVideoOff)}
+          >
             <MaterialCommunityIcons
-              name="camera-flip-outline"
-              size={30}
+              name={isVideoOff ? "video-off" : "video"}
+              size={28}
               color={COLORS.white}
             />
           </TouchableOpacity>
+          
+          {/* Switch Camera */}
+          <TouchableOpacity style={styles.controlButton}>
+            <MaterialCommunityIcons
+              name="camera-flip"
+              size={28}
+              color={COLORS.white}
+            />
+          </TouchableOpacity>
+          
+          {/* Speaker On/Off */}
+          <TouchableOpacity 
+            style={[styles.controlButton, !isSpeakerOn && styles.controlButtonActive]}
+            onPress={() => setIsSpeakerOn(!isSpeakerOn)}
+          >
+             <Ionicons
+              name={isSpeakerOn ? "volume-high" : "volume-off"}
+              size={28}
+              color={COLORS.white}
+            />
+          </TouchableOpacity>
+
+          {/* End Call */}
           <TouchableOpacity
             style={[styles.controlButton, styles.endCallButton]}
             onPress={handleEndCall}
@@ -188,14 +242,50 @@ const styles = StyleSheet.create({
   },
   overlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0, 0, 0, 0.3)", // Làm tối ảnh nền
+    backgroundColor: "rgba(0, 0, 0, 0.4)", // Giữ lớp phủ tối khi đang calling
+  },
+  videoOffScreen: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#111827',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  shadowText: {
+    textShadowColor: "rgba(0, 0, 0, 0.5)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+
+  // --- TOP CONTAINER & SELF VIEW ---
+  topContainer: {
+    paddingHorizontal: 20,
+    paddingTop: Platform.OS === "ios" ? 60 : 40,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
   },
   topControls: {
     flexDirection: "row",
     justifyContent: "space-between",
-    paddingHorizontal: 20,
-    paddingTop: Platform.OS === "ios" ? 60 : 40, // Đẩy xuống dưới notch
+    flex: 1,
   },
+  selfViewContainer: {
+    width: 100, 
+    height: 140, 
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginLeft: 10,
+    borderWidth: 2,
+    borderColor: COLORS.white,
+    backgroundColor: '#000',
+  },
+  selfViewImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+
+  // --- CENTER (Calling) ---
   centerContainer: {
     flex: 1,
     justifyContent: "center",
@@ -205,28 +295,10 @@ const styles = StyleSheet.create({
     width: 140,
     height: 140,
     borderRadius: 70,
-    backgroundColor: COLORS.secondary, // Màu hồng nhạt
+    backgroundColor: COLORS.lightOverlay, 
     justifyContent: "center",
     alignItems: "center",
-    opacity: 0.9,
-    position: 'relative',
-  },
-  avatarConnected: {
-    borderWidth: 3,
-    borderColor: '#22C55E',
-  },
-  connectedBadge: {
-    position: 'absolute',
-    bottom: 5,
-    right: 5,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#22C55E',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: COLORS.white,
+    marginBottom: 8,
   },
   avatar: {
     width: 120,
@@ -234,49 +306,77 @@ const styles = StyleSheet.create({
     borderRadius: 60,
   },
   nameText: {
-    fontSize: 28,
+    fontSize: 32,
     fontWeight: "700",
     color: COLORS.white,
     marginTop: 20,
-    textShadowColor: "rgba(0, 0, 0, 0.5)",
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 4,
+    ...Platform.select({
+      ios: { textShadowColor: "rgba(0, 0, 0, 0.5)", textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 4, },
+      android: { textShadowColor: "rgba(0, 0, 0, 0.5)", textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 4, },
+    })
   },
   statusText: {
     fontSize: 18,
     color: COLORS.textSecondary,
     marginTop: 4,
-    textShadowColor: "rgba(0, 0, 0, 0.5)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
+    ...Platform.select({
+      ios: { textShadowColor: "rgba(0, 0, 0, 0.5)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3, },
+      android: { textShadowColor: "rgba(0, 0, 0, 0.5)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3, },
+    })
   },
   callingAnimation: {
     marginTop: 16,
     opacity: 0.8,
   },
+
+  // --- CONNECTED INFO (Bottom Center) ---
+  connectedInfo: {
+    position: 'absolute',
+    bottom: height / 4, // Đặt thông tin thấp hơn một chút
+    width: '100%',
+    alignItems: 'center',
+  },
+  nameTextSmall: {
+    fontSize: 24,
+    fontWeight: "700",
+    color: COLORS.white,
+    ...Platform.select({
+      ios: { textShadowColor: "rgba(0, 0, 0, 0.5)", textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 4, },
+      android: { textShadowColor: "rgba(0, 0, 0, 0.5)", textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 4, },
+    })
+  },
+  statusTextConnected: {
+    fontSize: 18,
+    color: COLORS.connectedBorder,
+    fontWeight: '600',
+    marginTop: 4,
+  },
+
+  // --- BOTTOM CONTROLS ---
   bottomControls: {
     flexDirection: "row",
     justifyContent: "space-around",
     alignItems: "center",
-    backgroundColor: COLORS.darkTransparent, // Nền đen mờ
-    paddingHorizontal: 30,
-    paddingVertical: 20,
-    paddingBottom: Platform.OS === "ios" ? 40 : 20, // Đẩy lên trên thanh home
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    backgroundColor: COLORS.darkOverlay, 
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+    paddingBottom: Platform.OS === "ios" ? 40 : 15, 
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
   },
   controlButton: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: "rgba(255, 255, 255, 0.2)", // Trắng mờ
+    width: 56, // Giảm kích thước để chứa được nhiều nút hơn
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: COLORS.lightOverlay, 
     justifyContent: "center",
     alignItems: "center",
   },
   controlButtonActive: {
-    backgroundColor: COLORS.primary,
+    backgroundColor: COLORS.primary, // Màu sáng hơn cho trạng thái ON (ví dụ: mic on, video on)
   },
   endCallButton: {
-    backgroundColor: COLORS.primary, // Màu đỏ đô
+    backgroundColor: COLORS.endCall, // Đỏ tươi nổi bật
+    marginLeft: 10,
   },
 });
