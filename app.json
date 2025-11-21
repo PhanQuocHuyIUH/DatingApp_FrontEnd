@@ -13,14 +13,12 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+        "backgroundColor": "#b21e46",
+        "foregroundImage": "./assets/images/icon.png"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.anonymous.DatingApp",
+      "package": "com.phanquochuyiuh.datingapp",
       "softwareKeyboardLayoutMode": "pan"
     },
     "web": {
@@ -45,6 +43,13 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "apiUrl": "http://10.113.221.14:3000/api",
+      "router": {},
+      "eas": {
+        "projectId": "b1c7b69c-e8e7-4a80-ada0-0753d38f67ea"
+      }
     }
   }
 }

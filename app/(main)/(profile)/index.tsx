@@ -337,6 +337,15 @@ export default function ProfileScreen() {
                 </View>
               </View>
             )}
+
+            <TouchableOpacity
+              style={styles.logoutButton}
+              onPress={handleLogout}
+              activeOpacity={0.8}
+            >
+              <MaterialCommunityIcons name="logout" size={20} color={COLORS.white} />
+              <Text style={styles.logoutButtonText}>Đăng xuất</Text>
+            </TouchableOpacity>
           </View>
         </Animated.View>
       </ScrollView>
@@ -497,5 +506,27 @@ const styles = StyleSheet.create({
     color: COLORS.primary,
     fontWeight: "600",
     fontSize: 14,
+  },
+  logoutButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: COLORS.primary,
+    paddingVertical: 16,
+    paddingHorizontal: 32,
+    borderRadius: 25,
+    marginTop: 8,
+    marginBottom: 20,
+    shadowColor: COLORS.shadow,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  logoutButtonText: {
+    color: COLORS.white,
+    fontWeight: "700",
+    fontSize: 16,
+    marginLeft: 10,
   },
 });

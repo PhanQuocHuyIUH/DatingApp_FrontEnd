@@ -1,8 +1,10 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Constants from 'expo-constants';
 
-// Thay đổi URL này theo địa chỉ backend của bạn
-const API_URL = 'http://192.168.1.7:3000/api'; // Hoặc IP máy của bạn: http://192.168.1.x:5000/api
+// API URL từ environment variable (dễ chuyển đổi khi build)
+const API_URL = Constants.expoConfig?.extra?.apiUrl || 'http://192.168.1.7:3000/api';
+console.log('📡 API URL:', API_URL);
 
 const api = axios.create({
     baseURL: API_URL,
