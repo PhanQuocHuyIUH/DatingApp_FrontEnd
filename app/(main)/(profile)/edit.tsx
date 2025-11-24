@@ -46,6 +46,34 @@ const COLORS = {
   shadow: "rgba(201, 42, 109, 0.3)",
 };
 
+const AVAILABLE_LANGUAGES = [
+  "Vietnamese",
+  "English",
+  "Spanish",
+  "French",
+  "German",
+  "Chinese",
+  "Japanese",
+  "Korean",
+  "Italian",
+  "Russian",
+  "Portuguese",
+];
+
+const AVAILABLE_INTERESTS = [
+  "Hiking",
+  "Cooking",
+  "Traveling",
+  "Reading",
+  "Gaming",
+  "Photography",
+  "Music",
+  "Fitness",
+  "Art",
+  "Dancing",
+  "Coding",
+];
+
 // Toast Notification Component
 type ToastProps = {
   visible: boolean;
@@ -281,6 +309,126 @@ const PronounSelectorModal: React.FC<PronounSelectorModalProps> = ({
   );
 };
 
+const InterestSelectorModal = ({
+  visible,
+  onClose,
+  onSelect,
+  selectedInterests,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  onSelect: (interest: string) => void;
+  selectedInterests: string[];
+}) => {
+  return (
+    <Modal
+      animationType="slide"
+      transparent={true}
+      visible={visible}
+      onRequestClose={onClose}
+    >
+      <View style={styles.modalContainer}>
+        <View style={styles.modalContent}>
+          <Text style={styles.modalTitle}>Select an Interest</Text>
+          <ScrollView>
+            {AVAILABLE_INTERESTS.map((interest) => (
+              <TouchableOpacity
+                key={interest}
+                style={[
+                  styles.languageOption,
+                  selectedInterests.includes(interest) &&
+                    styles.languageOptionSelected,
+                ]}
+                onPress={() => {
+                  if (!selectedInterests.includes(interest)) {
+                    onSelect(interest);
+                  }
+                }}
+              >
+                <Text
+                  style={[
+                    styles.languageOptionText,
+                    selectedInterests.includes(interest) &&
+                      styles.languageOptionTextSelected,
+                  ]}
+                >
+                  {interest}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+          <TouchableOpacity
+            onPress={onClose}
+            style={[styles.modalButton, styles.cancelButton]}
+          >
+            <Text style={styles.cancelButtonText}>Close</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+};
+
+const LanguageSelectorModal = ({
+  visible,
+  onClose,
+  onSelect,
+  selectedLanguages,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  onSelect: (language: string) => void;
+  selectedLanguages: string[];
+}) => {
+  return (
+    <Modal
+      animationType="slide"
+      transparent={true}
+      visible={visible}
+      onRequestClose={onClose}
+    >
+      <View style={styles.modalContainer}>
+        <View style={styles.modalContent}>
+          <Text style={styles.modalTitle}>Select a Language</Text>
+          <ScrollView>
+            {AVAILABLE_LANGUAGES.map((language) => (
+              <TouchableOpacity
+                key={language}
+                style={[
+                  styles.languageOption,
+                  selectedLanguages.includes(language) &&
+                    styles.languageOptionSelected,
+                ]}
+                onPress={() => {
+                  if (!selectedLanguages.includes(language)) {
+                    onSelect(language);
+                  }
+                }}
+              >
+                <Text
+                  style={[
+                    styles.languageOptionText,
+                    selectedLanguages.includes(language) &&
+                      styles.languageOptionTextSelected,
+                  ]}
+                >
+                  {language}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+          <TouchableOpacity
+            onPress={onClose}
+            style={[styles.modalButton, styles.cancelButton]}
+          >
+            <Text style={styles.cancelButtonText}>Close</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+};
+
 export default function EditProfileScreen() {
   const [user, setUser] = useState<any>(null);
 
@@ -320,7 +468,11 @@ export default function EditProfileScreen() {
 
   const [isInterestModalVisible, setInterestModalVisible] = useState(false);
 
+  const [isInterestSelectorVisible, setInterestSelectorVisible] = useState(false);
+
   const [isLanguageModalVisible, setLanguageModalVisible] = useState(false);
+
+  const [isLanguageSelectorVisible, setLanguageSelectorVisible] = useState(false);
 
   const [isPronounModalVisible, setPronounModalVisible] = useState(false);
 
@@ -533,7 +685,7 @@ export default function EditProfileScreen() {
 
   const handleAddInterest = (interest: string) => {
     if (interest && !interests.includes(interest)) {
-      setInterests([...interests, interest]);
+      setInterests((prevInterests) => [...prevInterests, interest]);
     }
 
     setInterestModalVisible(false);
@@ -545,7 +697,7 @@ export default function EditProfileScreen() {
 
   const handleAddLanguage = (language: string) => {
     if (language && !languages.includes(language)) {
-      setLanguages([...languages, language]);
+      setLanguages((prevLanguages) => [...prevLanguages, language]);
     }
 
     setLanguageModalVisible(false);
@@ -913,7 +1065,7 @@ export default function EditProfileScreen() {
                 style={styles.rowIcon}
               />
             }
-            onPress={() => setInterestModalVisible(true)}
+            onPress={() => setInterestSelectorVisible(true)}
           />
 
           <View style={styles.pillContainer}>
@@ -940,7 +1092,7 @@ export default function EditProfileScreen() {
                 style={styles.rowIcon}
               />
             }
-            onPress={() => setLanguageModalVisible(true)}
+            onPress={() => setLanguageSelectorVisible(true)}
           />
 
           <View style={styles.pillContainer}>
@@ -1042,6 +1194,20 @@ export default function EditProfileScreen() {
         options={pronounOptions}
         currentValue={pronouns}
         title="Select Pronouns"
+      />
+
+      <LanguageSelectorModal
+        visible={isLanguageSelectorVisible}
+        onClose={() => setLanguageSelectorVisible(false)}
+        onSelect={handleAddLanguage}
+        selectedLanguages={languages}
+      />
+      
+      <InterestSelectorModal
+        visible={isInterestSelectorVisible}
+        onClose={() => setInterestSelectorVisible(false)}
+        onSelect={handleAddInterest}
+        selectedInterests={interests}
       />
     </>
   );
@@ -1382,4 +1548,25 @@ const styles = StyleSheet.create({
   pronounOptionText: { fontSize: 16, color: COLORS.text },
   pronounOptionTextSelected: { color: COLORS.white, fontWeight: "bold" },
   inputText: { fontSize: 16 },
+  languageOption: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: COLORS.gray,
+    marginBottom: 8,
+    alignItems: "center",
+  },
+  languageOptionSelected: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+  },
+  languageOptionText: {
+    fontSize: 16,
+    color: COLORS.text,
+  },
+  languageOptionTextSelected: {
+    color: COLORS.white,
+    fontWeight: "bold",
+  },
 });
