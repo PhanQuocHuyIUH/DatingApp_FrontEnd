@@ -1568,5 +1568,5 @@ const styles = StyleSheet.create({
   languageOptionTextSelected: {
     color: COLORS.white,
     fontWeight: "bold",
-  },
+},
 });

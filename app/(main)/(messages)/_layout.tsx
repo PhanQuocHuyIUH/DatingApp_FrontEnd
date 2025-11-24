@@ -35,7 +35,7 @@ const HeaderSearchBar = ({ value, onChange }: { value: string; onChange: (text: 
       style={styles.searchIcon}
     />
     <TextInput
-      placeholder="Search..."
+      placeholder="Search name"
       placeholderTextColor={COLORS.textSecondary}
       style={styles.searchInput}
       value={value}
