@@ -6,6 +6,7 @@ import Constants from 'expo-constants';
 const API_URL = Constants.expoConfig?.extra?.apiUrl || 'http://192.168.1.7:3000/api';
 console.log('📡 API URL:', API_URL);
 
+
 const api = axios.create({
     baseURL: API_URL,
     timeout: 10000,
