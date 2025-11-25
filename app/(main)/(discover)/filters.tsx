@@ -8,6 +8,8 @@ import {
   Switch,
   Animated,
   ActivityIndicator,
+  Modal,
+  FlatList,
 } from "react-native";
 import { router } from "expo-router";
 import {
@@ -29,6 +31,20 @@ const COLORS = {
   lightGray: "#F3F4F6", // Màu nền cho input, pill
   gray: "#E5E7EB",
 };
+
+const AVAILABLE_LANGUAGES = [
+  "Vietnam",
+  "English",
+  "Spanish",
+  "French",
+  "German",
+  "Chinese",
+  "Japanese",
+  "Korean",
+  "Italian",
+  "Russian",
+  "Portuguese",
+];
 
 // --- Component Checkbox Row với Animation ---
 type CheckboxRowProps = {
@@ -137,7 +153,8 @@ export default function FiltersScreen() {
   // State cho Toggle
   const [expandRange, setExpandRange] = useState(true);
   // State cho Ngôn ngữ
-  const [languages, setLanguages] = useState(["English", "Spanish"]);
+    const [languages, setLanguages] = useState(["English", "Spanish"]);
+  const [isLanguageModalVisible, setLanguageModalVisible] = useState(false);
   // State cho loading
   const [loading, setLoading] = useState(false);
   
@@ -164,6 +181,14 @@ export default function FiltersScreen() {
   // Hàm xử lý toggle Genders
   const toggleGender = (key: "male" | "female" | "nonbinary") => {
     setGenders((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  // Hàm thêm ngôn ngữ
+  const addLanguage = (language: string) => {
+    if (!languages.includes(language)) {
+      setLanguages((prev) => [...prev, language]);
+    }
+    setLanguageModalVisible(false);
   };
 
   // Hàm xóa Ngôn ngữ
@@ -350,29 +375,42 @@ export default function FiltersScreen() {
 
         {/* --- 4. Languages --- */}
         <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Ionicons name="language-outline" size={20} color={COLORS.primary} />
-            <Text style={styles.sectionTitle}>Languages:</Text>
+            <View style={styles.sectionHeader}>
+              <Ionicons name="language-outline" size={20} color={COLORS.primary} />
+              <Text style={styles.sectionTitle}>Languages:</Text>
+            </View>
+            <TouchableOpacity style={styles.dropdown} onPress={() => setLanguageModalVisible(true)}>
+              <Text style={styles.dropdownText}>Select languages</Text>
+              <Ionicons name="chevron-down" size={20} color={COLORS.textSecondary} />
+            </TouchableOpacity>
+            <View style={styles.pillContainer}>
+              {languages.map((lang) => (
+                <LanguagePill key={lang} label={lang} onRemove={() => removeLanguage(lang)} />
+              ))}
+            </View>
           </View>
-          <TouchableOpacity style={styles.dropdown}>
-            <Text style={styles.dropdownText}>Select languages</Text>
-            <Ionicons
-              name="chevron-down"
-              size={20}
-              color={COLORS.textSecondary}
+          </ScrollView>
+          
+          {/* --- Modal Chọn Ngôn Ngữ --- */}
+      <Modal visible={isLanguageModalVisible} animationType="slide" transparent={true}>
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Select a Language</Text>
+            <FlatList
+              data={AVAILABLE_LANGUAGES}
+              keyExtractor={(item) => item}
+              renderItem={({ item }) => (
+                <TouchableOpacity style={styles.languageItem} onPress={() => addLanguage(item)}>
+                  <Text style={styles.languageText}>{item}</Text>
+                </TouchableOpacity>
+              )}
             />
-          </TouchableOpacity>
-          <View style={styles.pillContainer}>
-            {languages.map((lang) => (
-              <LanguagePill
-                key={lang}
-                label={lang}
-                onRemove={() => removeLanguage(lang)}
-              />
-            ))}
+            <TouchableOpacity style={styles.closeButton} onPress={() => setLanguageModalVisible(false)}>
+              <Text style={styles.closeButtonText}>Close</Text>
+            </TouchableOpacity>
           </View>
         </View>
-      </ScrollView>
+      </Modal>
       </Animated.View>
 
       {/* --- Footer Buttons --- */}
@@ -402,6 +440,8 @@ export default function FiltersScreen() {
       </View>
       </LinearGradient>
     </View>
+
+    
   );
 }
 
@@ -586,4 +626,11 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     marginLeft: 6,
   },
+  modalContainer: { flex: 1, justifyContent: "center", backgroundColor: "rgba(0,0,0,0.5)" },
+  modalContent: { backgroundColor: COLORS.white, margin: 20, borderRadius: 10, padding: 20 },
+  modalTitle: { fontSize: 18, fontWeight: "bold", marginBottom: 10 },
+  languageItem: { padding: 10, borderBottomWidth: 1, borderBottomColor: COLORS.gray },
+  languageText: { fontSize: 16, color: COLORS.text },
+  closeButton: { marginTop: 10, alignItems: "center" },
+  closeButtonText: { fontSize: 16, color: COLORS.primary, fontWeight: "bold" }
 });
