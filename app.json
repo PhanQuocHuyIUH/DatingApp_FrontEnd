@@ -21,6 +21,8 @@
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "package": "com.anonymous.DatingApp",
+      "permissions": ["INTERNET", "ACCESS_NETWORK_STATE"],
+      "usesCleartextTraffic": true,
       "softwareKeyboardLayoutMode": "pan"
     },
     "web": {
@@ -45,6 +47,13 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "apiUrl": "http://10.113.221.14:3000/api",
+      "router": {},
+      "eas": {
+        "projectId": "b1c7b69c-e8e7-4a80-ada0-0753d38f67ea"
+      }
     }
   }
 }

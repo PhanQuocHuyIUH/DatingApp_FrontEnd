@@ -3,7 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../api/config';
 
 // Derive base URL (remove trailing /api if present)
-const API_BASE = api?.defaults?.baseURL?.replace(/\/api$/,'') || 'http://localhost:3000';
+const API_BASE = api?.defaults?.baseURL?.replace(/\/api$/, '') || 'http://localhost:3000';
 
 let socket = null;
 let typingTimeouts = {};
@@ -17,7 +17,7 @@ export const socketService = {
     const token = await AsyncStorage.getItem('token');
     console.log('🔐 Initializing socket with token:', token ? 'exists' : 'missing');
     console.log('🌐 Socket URL:', API_BASE);
-    
+
     socket = io(API_BASE, {
       transports: ['websocket'],
       auth: { token },
@@ -26,15 +26,15 @@ export const socketService = {
       reconnectionAttempts: 10,
       reconnectionDelay: 800,
     });
-    
+
     socket.on('connect', () => {
       console.log('✅ Socket connected successfully, ID:', socket.id);
     });
-    
+
     socket.on('disconnect', (reason) => {
       console.log('❌ Socket disconnected:', reason);
     });
-    
+
     return new Promise((resolve, reject) => {
       socket.on('connect', () => resolve(socket));
       socket.on('connect_error', (err) => {
@@ -70,8 +70,13 @@ export const socketService = {
   emitTyping: ({ conversationId, receiverId, isTyping }) => {
     socket?.emit(isTyping ? 'typing_start' : 'typing_stop', { conversationId, receiverId });
   },
-  emitRead: ({ messageId, conversationId, senderId }) => {
-    socket?.emit('message_read', { messageId, conversationId, senderId });
+  emitRead: ({ messageId, conversationId, senderId } = {}) => {
+    if (messageId) {
+      socket?.emit('message_read', { messageId, conversationId, senderId });
+    } else if (conversationId) {
+      // Mark entire conversation as read
+      socket?.emit('conversation_read', { conversationId });
+    }
   },
   debounceTyping: ({ conversationId, receiverId }) => {
     // Start typing
@@ -80,5 +85,13 @@ export const socketService = {
     typingTimeouts[conversationId] = setTimeout(() => {
       socketService.emitTyping({ conversationId, receiverId, isTyping: false });
     }, 1500);
+  },
+  stopTyping: ({ conversationId, receiverId }) => {
+    // Clear timeout and emit stop immediately
+    if (typingTimeouts[conversationId]) {
+      clearTimeout(typingTimeouts[conversationId]);
+      delete typingTimeouts[conversationId];
+    }
+    socketService.emitTyping({ conversationId, receiverId, isTyping: false });
   }
 };

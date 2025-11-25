@@ -1,11 +1,8 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import Constants from 'expo-constants';
 
-// API URL từ environment variable (dễ chuyển đổi khi build)
-const API_URL = 'https://datingapp-backend-0khx.onrender.com/api';
-console.log('📡 API URL:', API_URL);
-
+// Thay đổi URL này theo địa chỉ backend của bạn
+const API_URL = 'https://datingapp-backend-0khx.onrender.com/api'; // Hoặc IP máy của bạn: http://192.168.1.x:5000/api
 
 const api = axios.create({
     baseURL: API_URL,

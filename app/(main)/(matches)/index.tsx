@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, FlatList, Image, RefreshControl, ActivityIndicator, Animated } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, FlatList, Image, RefreshControl, ActivityIndicator, Animated, Alert } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialIcons, Ionicons } from '@expo/vector-icons';
@@ -81,9 +81,10 @@ const humanizeMatchTime = (ts?: string) => {
 
 export default function MatchesScreen() {
   const router = useRouter();
-  const [tab, setTab] = useState<'matches' | 'liked'>('matches');
+  const [tab, setTab] = useState<'matches' | 'liked' | 'likes-me'>('matches');
   const [matches, setMatches] = useState<MatchItem[]>([]);
   const [liked, setLiked] = useState<Profile[]>([]);
+  const [likesMe, setLikesMe] = useState<Profile[]>([]);
   const [superLikedIds, setSuperLikedIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -125,20 +126,23 @@ export default function MatchesScreen() {
     setLoading(true);
     setError('');
     try {
-      const [mRes, lRes, sRes] = await Promise.all([
+      const [mRes, lRes, sRes, likesRes] = await Promise.all([
         matchService.getMatches(),
         discoveryService.getLikedSwiped(50),
         discoveryService.getSuperLiked(50),
+        discoveryService.getLikes(),
       ]);
       const m = mRes?.data?.matches || [];
       const l = lRes?.data?.profiles || [];
       const s = sRes?.data?.profiles || [];
+      const likes = likesRes?.data?.users || [];
       
       // Create set of superliked user IDs
       const superLikedSet = new Set<string>(s.map((p: any) => String(p._id || p.id)));
       
       setMatches(m);
       setLiked(l);
+      setLikesMe(likes);
       setSuperLikedIds(superLikedSet);
     } catch (err: any) {
       setError(err?.message || 'Failed to load');
@@ -162,7 +166,21 @@ export default function MatchesScreen() {
 
   const renderHeader = () => (
     <View style={styles.header}>
-      <Text style={styles.title}>Matches</Text>
+      <View style={styles.headerRow}>
+        <Text style={styles.title}>Matches</Text>
+        <TouchableOpacity
+          style={styles.refreshButton}
+          onPress={loadData}
+          activeOpacity={0.7}
+          disabled={loading}
+        >
+          <MaterialIcons 
+            name="refresh" 
+            size={24} 
+            color={loading ? COLORS.muted : COLORS.primary} 
+          />
+        </TouchableOpacity>
+      </View>
       <View style={styles.tabs}>
         <TouchableOpacity
           style={[styles.tab, tab === 'matches' && styles.tabActive]}
@@ -175,6 +193,12 @@ export default function MatchesScreen() {
           onPress={() => setTab('liked')}
         >
           <Text style={[styles.tabText, tab === 'liked' && styles.tabTextActive]}>Liked</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, tab === 'likes-me' && styles.tabActive]}
+          onPress={() => setTab('likes-me')}
+        >
+          <Text style={[styles.tabText, tab === 'likes-me' && styles.tabTextActive]}>Likes Me</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -245,8 +269,18 @@ export default function MatchesScreen() {
         const res = await chatService.createConversation(item.id);
         const conv = res?.data?.conversation || res?.conversation || res?.data;
         if (conv?.id) {
-          const other = conv.participants?.find?.((p:any)=> p._id !== item.user.id);
-          router.push({ pathname: '/(main)/(messages)/[chatId]', params: { chatId: String(conv.id), matchId: String(item.id), userId: other?._id || '' } });
+          router.push({ 
+            pathname: '/(main)/(messages)/[chatId]', 
+            params: { 
+              chatId: String(conv.id), 
+              matchId: String(item.id), 
+              userId: String(item.user.id),
+              userName: item.user.name,
+              userAge: String(item.user.age || ''),
+              avatar: img,
+              isSuperLike: String(isSuperLike),
+            } 
+          });
         }
       } catch {
         // noop; could show toast
@@ -343,6 +377,80 @@ export default function MatchesScreen() {
           </View>
         </View>
       </View>
+    );
+  };
+
+  const LikesMeCard = ({ item }: { item: Profile }) => {
+    const img = getProfileImage(item);
+    const displayName = item.name + (item.age ? `, ${item.age}` : '');
+    const [swiping, setSwiping] = useState(false);
+    
+    const handleSwipe = async (action: 'like' | 'superlike') => {
+      setSwiping(true);
+      try {
+        const userId = String(item._id || item.id);
+        const result = await discoveryService.swipe(userId, action) as any;
+        
+        if (result?.data?.isMatch) {
+          // Show match notification
+          Alert.alert('🎉 It\'s a Match!', `You matched with ${item.name}!`);
+        }
+        
+        // Remove from likes-me list
+        setLikesMe(prev => prev.filter(p => String(p._id || p.id) !== userId));
+      } catch (err: any) {
+        Alert.alert('Error', err?.message || 'Failed to swipe');
+      } finally {
+        setSwiping(false);
+      }
+    };
+    
+    return (
+      <TouchableOpacity 
+        activeOpacity={0.9} 
+        onPress={() => openLikedDetail(item)}
+      >
+        <View style={styles.card}>
+          <View style={styles.cardContent}>
+            <View style={styles.avatarContainer}>
+              <Image source={{ uri: img }} style={styles.avatar} />
+              {item.isOnline && <View style={styles.onlineBadge} />}
+            </View>
+            <View style={{ flex: 1 }}>
+              <View style={styles.row}>
+                <Text style={styles.name}>{displayName}</Text>
+                <View style={styles.newBadge}><Text style={styles.newBadgeText}>LIKES YOU</Text></View>
+              </View>
+              {item.occupation && (
+                <Text style={styles.occupation} numberOfLines={1}>{item.occupation}</Text>
+              )}
+              {item.bio && (
+                <Text style={styles.meta} numberOfLines={2}>{item.bio}</Text>
+              )}
+              <View style={styles.actions}>
+                <TouchableOpacity 
+                  style={[styles.btn, styles.btnPrimary]} 
+                  onPress={() => handleSwipe('like')}
+                  activeOpacity={0.8}
+                  disabled={swiping}
+                >
+                  <MaterialIcons name="favorite" size={18} color="#fff" />
+                  <Text style={styles.btnPrimaryText}>Like Back</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={[styles.btn, styles.btnSuperLike]} 
+                  onPress={() => handleSwipe('superlike')}
+                  activeOpacity={0.8}
+                  disabled={swiping}
+                >
+                  <Ionicons name="star" size={18} color="#fff" />
+                  <Text style={styles.btnSuperLikeText}>Super Like</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </View>
+      </TouchableOpacity>
     );
   };
 
@@ -446,19 +554,39 @@ export default function MatchesScreen() {
       );
     }
     // liked
-    if (!liked.length) {
+    if (tab === 'liked') {
+      if (!liked.length) {
+        return (
+          <View style={styles.centered}>
+            <MaterialIcons name="thumb-up-off-alt" size={48} color={COLORS.muted} />
+            <Text style={styles.muted}>You haven't liked anyone yet</Text>
+          </View>
+        );
+      }
+      return (
+        <FlatList
+          data={liked}
+          keyExtractor={(it) => (it._id || it.id)!}
+          renderItem={({ item }) => <LikedCard item={item} />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+          contentContainerStyle={{ paddingBottom: 24 }}
+        />
+      );
+    }
+    // likes-me
+    if (!likesMe.length) {
       return (
         <View style={styles.centered}>
-          <MaterialIcons name="thumb-up-off-alt" size={48} color={COLORS.muted} />
-          <Text style={styles.muted}>You haven’t liked anyone yet</Text>
+          <MaterialIcons name="favorite-border" size={48} color={COLORS.muted} />
+          <Text style={styles.muted}>No one has liked you yet</Text>
         </View>
       );
     }
     return (
       <FlatList
-        data={liked}
+        data={likesMe}
         keyExtractor={(it) => (it._id || it.id)!}
-        renderItem={({ item }) => <LikedCard item={item} />}
+        renderItem={({ item }) => <LikesMeCard item={item} />}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         contentContainerStyle={{ paddingBottom: 24 }}
       />
@@ -478,16 +606,34 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.bg,
-    padding: 16,
   },
   header: {
     marginBottom: 12,
+    paddingHorizontal: 16,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  refreshButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#fff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   title: {
     fontSize: 28,
     fontWeight: '800',
     color: COLORS.text,
-    marginBottom: 12,
   },
   tabs: {
     flexDirection: 'row',
@@ -520,6 +666,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 3,
     marginBottom: 16,
+    marginHorizontal: 16,
   },
   cardWrapper: {
     marginBottom: 16,
@@ -533,6 +680,8 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 3,
     overflow: 'hidden',
+    marginBottom: 16,
+    marginHorizontal: 16,
   },
   cardSuperLike: {
     borderRadius: 14,
@@ -595,12 +744,14 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexWrap: 'wrap',
   },
   name: {
     fontSize: 17,
     fontWeight: '800',
     color: COLORS.text,
     marginRight: 8,
+    flexShrink: 1,
   },
   occupation: {
     fontSize: 13,
@@ -630,6 +781,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     marginTop: 10,
     gap: 8,
+  },
+  alreadyLikedContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: '#FFF5F5',
+    borderRadius: 8,
+  },
+  alreadyLikedText: {
+    fontSize: 13,
+    color: COLORS.primary,
+    fontWeight: '500',
   },
   btn: {
     flexDirection: 'row',
@@ -671,6 +837,19 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   btnDangerText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 14,
+  },
+  btnSuperLike: {
+    backgroundColor: COLORS.blue,
+    shadowColor: COLORS.blue,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  btnSuperLikeText: {
     color: '#fff',
     fontWeight: '700',
     fontSize: 14,
