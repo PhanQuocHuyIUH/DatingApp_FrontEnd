@@ -1,21 +1,20 @@
-import { router } from "expo-router";
-import React, { useState, useEffect, useRef } from "react";
-import {
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-  SafeAreaView,
-  ScrollView,
-  Alert,
-  ActivityIndicator,
-  Platform,
-  Animated,
-} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { LinearGradient } from 'expo-linear-gradient';
+import { router } from "expo-router";
+import React, { useEffect, useRef, useState } from "react";
+import {
+    ActivityIndicator,
+    Animated,
+    Platform,
+    SafeAreaView,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
+} from "react-native";
 import { authService } from "../../services/authService";
 
 // Custom Toast Component
@@ -189,7 +188,7 @@ export default function RegisterScreen() {
         <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <TouchableOpacity onPress={() => router.push("/(auth)")} style={styles.backButton}>
             <Ionicons name="arrow-back" size={24} color={COLORS.text} />
           </TouchableOpacity>
           <Text style={styles.title}>Create Account</Text>
