@@ -12,6 +12,8 @@ import {
 	View,
 } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
+import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { matchService } from '../../../services/matchService';
 import { chatService } from '../../../services/chatService';
 import { discoveryService } from '../../../services/discoveryService';
@@ -127,22 +129,29 @@ export default function MatchDetailScreen() {
 	};
 
 	const handleChat = async () => {
-		if (!isMatchType || !match?.id) return;
+		if (!isMatchType || !match?.id || !profile) return;
 		try {
 			setLoading(true);
 			const res = await chatService.createConversation(match.id);
 			const conv = res?.data?.conversation || res?.conversation || res?.data;
 			if (conv?.id) {
-				const other = conv.participants?.find?.((p: any) => String(p._id) !== String((profile as any)?.id || (profile as any)?._id));
-				const header = other ? {
-					userName: other.name,
-					userAge: other.age,
-					avatar: (other.photos?.find?.((ph:any)=>ph.isMain && ph.url)?.url) || (other.photos?.[0]?.url) || undefined,
-				} : {};
-				const otherUser = conv.participants?.find?.((p:any)=> String(p._id) !== String((profile as any)?.id || (profile as any)?._id));
+				// Get photos array properly
+				const photos = (profile.photos || []) as ProfilePhoto[];
+				const photoUrl = photos
+					.map((p) => (typeof p === 'string' ? p : p?.url))
+					.filter(Boolean)[0] || '';
+
+				// Navigate with matched user's info (not self)
 				router.push({
 					pathname: '/(main)/(messages)/[chatId]',
-					params: { chatId: String(conv.id), matchId: String(match.id), userId: otherUser?._id || '', ...header },
+					params: { 
+						chatId: String(conv.id), 
+						matchId: String(match.id),
+						userId: String(profile.id),
+						userName: profile.name || 'User',
+						userAge: profile.age?.toString() || '',
+						avatar: photoUrl,
+					},
 				});
 			} else {
 				Alert.alert('Error', 'Failed to open conversation');
@@ -184,38 +193,56 @@ export default function MatchDetailScreen() {
 
 	if (loading) {
 		return (
-			<View style={styles.centered}>
-				<ActivityIndicator size="large" color="#FF5A5F" />
+			<LinearGradient
+				colors={['#0E0F13', '#1A1C22', '#0E0F13']}
+				style={styles.centered}
+			>
+				<ActivityIndicator size="large" color="#FF6B9D" />
 				<Text style={styles.muted}>Loading...</Text>
-			</View>
+			</LinearGradient>
 		);
 	}
 
 	if (error) {
 		return (
-			<View style={styles.centered}>
+			<LinearGradient
+				colors={['#0E0F13', '#1A1C22', '#0E0F13']}
+				style={styles.centered}
+			>
+				<MaterialCommunityIcons name="alert-circle" size={64} color="#FF6B6B" />
 				<Text style={styles.errorText}>{error}</Text>
 				<TouchableOpacity style={styles.primaryButton} onPress={() => router.back()}>
 					<Text style={styles.primaryButtonText}>Go Back</Text>
 				</TouchableOpacity>
-			</View>
+			</LinearGradient>
 		);
 	}
 
 	if (!profile) {
 		return (
-			<View style={styles.centered}>
+			<LinearGradient
+				colors={['#0E0F13', '#1A1C22', '#0E0F13']}
+				style={styles.centered}
+			>
+				<MaterialCommunityIcons name="account-off" size={64} color="#A0A3AD" />
 				<Text style={styles.muted}>Profile not found.</Text>
 				<TouchableOpacity style={styles.primaryButton} onPress={() => router.back()}>
 					<Text style={styles.primaryButtonText}>Go Back</Text>
 				</TouchableOpacity>
-			</View>
+			</LinearGradient>
 		);
 	}
 
 	return (
-		<View style={styles.container}>
-			<Stack.Screen options={{ title: getTitle() }} />
+		<LinearGradient
+			colors={['#0E0F13', '#1A1C22', '#0E0F13']}
+			style={styles.container}
+		>
+			<Stack.Screen options={{ 
+				title: getTitle(),
+				headerStyle: { backgroundColor: '#1A1C22' },
+				headerTintColor: '#FFFFFF',
+			}} />
 			<ScrollView contentContainerStyle={{ paddingBottom: 24 }}>
 				{/* Photos carousel */}
 				{photos.length > 0 ? (
@@ -227,7 +254,13 @@ export default function MatchDetailScreen() {
 							showsHorizontalScrollIndicator={false}
 							keyExtractor={(item, idx) => `${item}-${idx}`}
 							renderItem={({ item }) => (
-								<Image source={{ uri: item }} style={styles.photo} resizeMode="cover" />
+								<View>
+									<Image source={{ uri: item }} style={styles.photo} resizeMode="cover" />
+									<LinearGradient
+										colors={['transparent', 'rgba(0,0,0,0.3)', 'rgba(0,0,0,0.7)']}
+										style={styles.photoGradient}
+									/>
+								</View>
 							)}
 							onViewableItemsChanged={onViewableItemsChanged}
 							viewabilityConfig={viewConfig}
@@ -240,26 +273,52 @@ export default function MatchDetailScreen() {
 					</View>
 				) : (
 					<View style={[styles.carouselContainer, styles.photoPlaceholder]}>
+						<MaterialCommunityIcons name="image-off" size={64} color="#3A3D4A" />
 						<Text style={styles.muted}>No photos</Text>
 					</View>
 				)}
 
 				{/* Info */}
 				<View style={styles.infoBox}>
-					<Text style={styles.nameRow}>
-						{profile.name || 'Unknown'} {profile.age ? `· ${profile.age}` : ''}
-					</Text>
+					<View style={styles.nameRowContainer}>
+						<Text style={styles.nameRow}>
+							{profile.name || 'Unknown'} 
+						</Text>
+						{profile.age && (
+							<Text style={styles.ageText}>{profile.age}</Text>
+						)}
+					</View>
 					{profile.distanceKm != null && (
-						<Text style={styles.distance}>{profile.distanceKm} km away</Text>
+						<View style={styles.distanceRow}>
+							<Ionicons name="location" size={16} color="#FF6B9D" />
+							<Text style={styles.distance}>{profile.distanceKm} km away</Text>
+						</View>
 					)}
-					{!!profile.bio && <Text style={styles.bio}>{profile.bio}</Text>}
+					{!!profile.bio && (
+						<View style={styles.bioContainer}>
+							<MaterialCommunityIcons name="text" size={20} color="#FF6B9D" />
+							<Text style={styles.bio}>{profile.bio}</Text>
+						</View>
+					)}
 					{!!profile.interests?.length && (
-						<View style={styles.chipsRow}>
-							{profile.interests.slice(0, 12).map((tag, i) => (
-								<View key={`${tag}-${i}`} style={styles.chip}>
-									<Text style={styles.chipText}>{tag}</Text>
-								</View>
-							))}
+						<View>
+							<View style={styles.sectionHeader}>
+								<MaterialCommunityIcons name="heart" size={20} color="#FF6B9D" />
+								<Text style={styles.sectionTitle}>Interests</Text>
+							</View>
+							<View style={styles.chipsRow}>
+								{profile.interests.slice(0, 12).map((tag, i) => (
+									<LinearGradient
+										key={`${tag}-${i}`}
+										colors={['#FF6B9D', '#C92A6D']}
+										start={{ x: 0, y: 0 }}
+										end={{ x: 1, y: 0 }}
+										style={styles.chip}
+									>
+										<Text style={styles.chipText}>{tag}</Text>
+									</LinearGradient>
+								))}
+							</View>
 						</View>
 					)}
 				</View>
@@ -268,28 +327,46 @@ export default function MatchDetailScreen() {
 				<View style={styles.actionsRow}>
 					{isMatchType ? (
 						<>
-							<TouchableOpacity style={[styles.primaryButton, { flex: 1 }]} onPress={handleChat}>
-								<Text style={styles.primaryButtonText}>Chat</Text>
+							<TouchableOpacity style={{ flex: 1 }} onPress={handleChat}>
+								<LinearGradient
+									colors={['#FF6B9D', '#C92A6D']}
+									start={{ x: 0, y: 0 }}
+									end={{ x: 1, y: 0 }}
+									style={styles.primaryButton}
+								>
+									<Ionicons name="chatbubble" size={20} color="#FFFFFF" />
+									<Text style={styles.primaryButtonText}>Chat</Text>
+								</LinearGradient>
 							</TouchableOpacity>
 							<View style={{ width: 12 }} />
 							<TouchableOpacity style={[styles.secondaryButton, { flex: 1 }]} onPress={handleUnmatch}>
-								<Text style={styles.secondaryButtonText}>Unmatch</Text>
+								<MaterialCommunityIcons name="account-remove" size={20} color="#FF6B6B" />
+								<Text style={[styles.secondaryButtonText, { color: '#FF6B6B' }]}>Unmatch</Text>
 							</TouchableOpacity>
 						</>
 					) : (
 						<>
-							<TouchableOpacity style={[styles.primaryButton, { flex: 1 }]} onPress={handleSuperLike}>
-								<Text style={styles.primaryButtonText}>Super Like</Text>
+							<TouchableOpacity style={{ flex: 1 }} onPress={handleSuperLike}>
+								<LinearGradient
+									colors={['#4FC3F7', '#1E88E5']}
+									start={{ x: 0, y: 0 }}
+									end={{ x: 1, y: 0 }}
+									style={styles.primaryButton}
+								>
+									<MaterialCommunityIcons name="star" size={20} color="#FFFFFF" />
+									<Text style={styles.primaryButtonText}>Super Like</Text>
+								</LinearGradient>
 							</TouchableOpacity>
 							<View style={{ width: 12 }} />
 							<TouchableOpacity style={[styles.secondaryButton, { flex: 1 }]} onPress={handleUndoLike}>
+								<Ionicons name="arrow-undo" size={20} color="#FFFFFF" />
 								<Text style={styles.secondaryButtonText}>Undo Like</Text>
 							</TouchableOpacity>
 						</>
 					)}
 				</View>
 			</ScrollView>
-		</View>
+		</LinearGradient>
 	);
 }
 
@@ -299,21 +376,24 @@ const PHOTO_H = Math.round(width * 1.2);
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
-		backgroundColor: '#0E0F13',
 	},
 	centered: {
 		flex: 1,
 		justifyContent: 'center',
 		alignItems: 'center',
-		backgroundColor: '#0E0F13',
+		paddingHorizontal: 24,
 	},
 	muted: {
 		color: '#A0A3AD',
-		marginTop: 8,
+		marginTop: 12,
+		fontSize: 16,
 	},
 	errorText: {
 		color: '#FF6B6B',
-		marginBottom: 12,
+		marginTop: 12,
+		marginBottom: 24,
+		fontSize: 16,
+		textAlign: 'center',
 	},
 	carouselContainer: {
 		width: '100%',
@@ -324,13 +404,20 @@ const styles = StyleSheet.create({
 		width,
 		height: PHOTO_H,
 	},
+	photoGradient: {
+		position: 'absolute',
+		bottom: 0,
+		left: 0,
+		right: 0,
+		height: PHOTO_H * 0.4,
+	},
 	photoPlaceholder: {
 		justifyContent: 'center',
 		alignItems: 'center',
 	},
 	dots: {
 		position: 'absolute',
-		bottom: 12,
+		bottom: 20,
 		left: 0,
 		right: 0,
 		flexDirection: 'row',
@@ -345,54 +432,104 @@ const styles = StyleSheet.create({
 		marginHorizontal: 3,
 	},
 	dotActive: {
-		backgroundColor: '#FFFFFF',
+		backgroundColor: '#FF6B9D',
+		width: 24,
 	},
 	infoBox: {
-		paddingHorizontal: 16,
-		paddingTop: 16,
+		paddingHorizontal: 20,
+		paddingTop: 20,
+	},
+	nameRowContainer: {
+		flexDirection: 'row',
+		alignItems: 'baseline',
+		marginBottom: 8,
 	},
 	nameRow: {
 		color: '#FFFFFF',
-		fontSize: 22,
+		fontSize: 28,
 		fontWeight: '700',
+	},
+	ageText: {
+		color: '#A0A3AD',
+		fontSize: 24,
+		fontWeight: '600',
+		marginLeft: 8,
+	},
+	distanceRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		marginTop: 4,
+		marginBottom: 16,
 	},
 	distance: {
 		color: '#A0A3AD',
-		marginTop: 4,
+		marginLeft: 6,
+		fontSize: 14,
+	},
+	bioContainer: {
+		flexDirection: 'row',
+		alignItems: 'flex-start',
+		marginTop: 16,
+		backgroundColor: 'rgba(255, 107, 157, 0.1)',
+		padding: 12,
+		borderRadius: 12,
+		borderLeftWidth: 3,
+		borderLeftColor: '#FF6B9D',
 	},
 	bio: {
 		color: '#D8DAE0',
-		marginTop: 12,
-		lineHeight: 20,
+		flex: 1,
+		marginLeft: 10,
+		lineHeight: 22,
+		fontSize: 15,
+	},
+	sectionHeader: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		marginTop: 20,
+		marginBottom: 12,
+	},
+	sectionTitle: {
+		color: '#FFFFFF',
+		fontSize: 18,
+		fontWeight: '700',
+		marginLeft: 8,
 	},
 	chipsRow: {
 		flexDirection: 'row',
 		flexWrap: 'wrap',
-		gap: 8,
-		rowGap: 8,
-		marginTop: 12,
+		gap: 10,
+		rowGap: 10,
 	},
 	chip: {
-		backgroundColor: '#1F2230',
-		borderRadius: 16,
-		paddingHorizontal: 10,
-		paddingVertical: 6,
+		borderRadius: 20,
+		paddingHorizontal: 14,
+		paddingVertical: 8,
+		flexDirection: 'row',
+		alignItems: 'center',
 	},
 	chipText: {
-		color: '#C9CBD3',
-		fontSize: 12,
+		color: '#FFFFFF',
+		fontSize: 13,
+		fontWeight: '600',
 	},
 	actionsRow: {
 		flexDirection: 'row',
-		paddingHorizontal: 16,
-		marginTop: 16,
+		paddingHorizontal: 20,
+		marginTop: 24,
 	},
 	primaryButton: {
-		backgroundColor: '#FF5A5F',
-		borderRadius: 12,
-		paddingVertical: 14,
+		flexDirection: 'row',
 		alignItems: 'center',
 		justifyContent: 'center',
+		borderRadius: 12,
+		paddingVertical: 16,
+		gap: 8,
+		shadowColor: '#FF6B9D',
+		shadowOffset: { width: 0, height: 4 },
+		shadowOpacity: 0.3,
+		shadowRadius: 8,
+		elevation: 5,
 	},
 	primaryButtonText: {
 		color: '#FFFFFF',
@@ -400,13 +537,15 @@ const styles = StyleSheet.create({
 		fontWeight: '700',
 	},
 	secondaryButton: {
-		backgroundColor: 'transparent',
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'center',
+		backgroundColor: 'rgba(58, 61, 74, 0.5)',
 		borderWidth: 1,
 		borderColor: '#3A3D4A',
 		borderRadius: 12,
-		paddingVertical: 14,
-		alignItems: 'center',
-		justifyContent: 'center',
+		paddingVertical: 16,
+		gap: 8,
 	},
 	secondaryButtonText: {
 		color: '#FFFFFF',

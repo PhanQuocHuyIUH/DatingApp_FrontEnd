@@ -3,13 +3,14 @@ import {
   Entypo,
   Feather,
   FontAwesome5,
+  Ionicons,
   MaterialCommunityIcons,
   SimpleLineIcons,
 } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import * as Location from "expo-location";
 import { Stack } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -21,18 +22,119 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  Animated,
 } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import { userService } from "../../../services/userService";
 
 const COLORS = {
-  primary: "#b21e46",
-  primaryLight: "#cc5073",
-  secondary: "#fae0e7",
-  text: "#1F2937",
-  textSecondary: "#6B7280",
+  primary: "#FF6B9D",
+  primaryDark: "#C92A6D",
+  primaryLight: "#FFB4D5",
+  secondary: "#FEF3F7",
+  accent: "#FFD93D",
+  text: "#2D3748",
+  textSecondary: "#718096",
   white: "#FFFFFF",
-  gray: "#E5E7EB",
-  lightGray: "#F3F4F6",
+  gray: "#E2E8F0",
+  lightGray: "#F7FAFC",
+  gradient1: ["#FF6B9D", "#C92A6D"],
+  gradient2: ["#FFB4D5", "#FF6B9D"],
+  success: "#48BB78",
+  error: "#F56565",
+  warning: "#ED8936",
+  shadow: "rgba(201, 42, 109, 0.3)",
+};
+
+const AVAILABLE_LANGUAGES = [
+  "Vietnamese",
+  "English",
+  "Spanish",
+  "French",
+  "German",
+  "Chinese",
+  "Japanese",
+  "Korean",
+  "Italian",
+  "Russian",
+  "Portuguese",
+];
+
+const AVAILABLE_INTERESTS = [
+  "Hiking",
+  "Cooking",
+  "Traveling",
+  "Reading",
+  "Gaming",
+  "Photography",
+  "Music",
+  "Fitness",
+  "Art",
+  "Dancing",
+  "Coding",
+];
+
+// Toast Notification Component
+type ToastProps = {
+  visible: boolean;
+  message: string;
+  type: 'success' | 'error' | 'info';
+  onHide: () => void;
+};
+const ToastNotification: React.FC<ToastProps> = ({ visible, message, type, onHide }) => {
+  const translateY = useRef(new Animated.Value(-100)).current;
+  const opacity = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (visible) {
+      Animated.parallel([
+        Animated.timing(translateY, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.timing(opacity, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+      ]).start();
+
+      const timer = setTimeout(() => {
+        Animated.parallel([
+          Animated.timing(translateY, {
+            toValue: -100,
+            duration: 300,
+            useNativeDriver: true,
+          }),
+          Animated.timing(opacity, {
+            toValue: 0,
+            duration: 300,
+            useNativeDriver: true,
+          }),
+        ]).start(() => onHide());
+      }, 3000);
+
+      return () => clearTimeout(timer);
+    }
+  }, [visible, translateY, opacity, onHide]);
+
+  if (!visible) return null;
+
+  const backgroundColor = type === 'success' ? COLORS.success : type === 'error' ? COLORS.error : COLORS.warning;
+  const icon = type === 'success' ? 'check-circle' : type === 'error' ? 'x-circle' : 'alert-circle';
+
+  return (
+    <Animated.View
+      style={[
+        styles.toastContainer,
+        { backgroundColor, transform: [{ translateY }], opacity },
+      ]}
+    >
+      <Feather name={icon} size={20} color={COLORS.white} />
+      <Text style={styles.toastText}>{message}</Text>
+    </Animated.View>
+  );
 };
 
 type ProfileRowProps = {
@@ -48,19 +150,19 @@ const ProfileRow: React.FC<ProfileRowProps> = ({
   value,
   onPress,
 }) => (
-  <TouchableOpacity style={styles.row} onPress={onPress}>
-    {icon}
+  <TouchableOpacity style={styles.row} onPress={onPress} activeOpacity={0.7}>
+    <View style={styles.rowIconContainer}>{icon}</View>
     <Text style={styles.rowLabel}>{label}</Text>
     <Text style={styles.rowValue}>{value || "Add"}</Text>
-    <Feather name="chevron-right" size={20} color={COLORS.textSecondary} />
+    <Feather name="chevron-right" size={20} color={COLORS.primary} />
   </TouchableOpacity>
 );
 
 const Pill = ({ label, onRemove }: { label: string; onRemove: () => void }) => (
   <View style={styles.pill}>
     <Text style={styles.pillText}>{label}</Text>
-    <TouchableOpacity onPress={onRemove}>
-      <Feather name="x" size={14} color={COLORS.primary} />
+    <TouchableOpacity onPress={onRemove} style={styles.pillRemove}>
+      <Feather name="x" size={12} color={COLORS.white} />
     </TouchableOpacity>
   </View>
 );
@@ -207,6 +309,126 @@ const PronounSelectorModal: React.FC<PronounSelectorModalProps> = ({
   );
 };
 
+const InterestSelectorModal = ({
+  visible,
+  onClose,
+  onSelect,
+  selectedInterests,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  onSelect: (interest: string) => void;
+  selectedInterests: string[];
+}) => {
+  return (
+    <Modal
+      animationType="slide"
+      transparent={true}
+      visible={visible}
+      onRequestClose={onClose}
+    >
+      <View style={styles.modalContainer}>
+        <View style={styles.modalContent}>
+          <Text style={styles.modalTitle}>Select an Interest</Text>
+          <ScrollView>
+            {AVAILABLE_INTERESTS.map((interest) => (
+              <TouchableOpacity
+                key={interest}
+                style={[
+                  styles.languageOption,
+                  selectedInterests.includes(interest) &&
+                    styles.languageOptionSelected,
+                ]}
+                onPress={() => {
+                  if (!selectedInterests.includes(interest)) {
+                    onSelect(interest);
+                  }
+                }}
+              >
+                <Text
+                  style={[
+                    styles.languageOptionText,
+                    selectedInterests.includes(interest) &&
+                      styles.languageOptionTextSelected,
+                  ]}
+                >
+                  {interest}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+          <TouchableOpacity
+            onPress={onClose}
+            style={[styles.modalButton, styles.cancelButton]}
+          >
+            <Text style={styles.cancelButtonText}>Close</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+};
+
+const LanguageSelectorModal = ({
+  visible,
+  onClose,
+  onSelect,
+  selectedLanguages,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  onSelect: (language: string) => void;
+  selectedLanguages: string[];
+}) => {
+  return (
+    <Modal
+      animationType="slide"
+      transparent={true}
+      visible={visible}
+      onRequestClose={onClose}
+    >
+      <View style={styles.modalContainer}>
+        <View style={styles.modalContent}>
+          <Text style={styles.modalTitle}>Select a Language</Text>
+          <ScrollView>
+            {AVAILABLE_LANGUAGES.map((language) => (
+              <TouchableOpacity
+                key={language}
+                style={[
+                  styles.languageOption,
+                  selectedLanguages.includes(language) &&
+                    styles.languageOptionSelected,
+                ]}
+                onPress={() => {
+                  if (!selectedLanguages.includes(language)) {
+                    onSelect(language);
+                  }
+                }}
+              >
+                <Text
+                  style={[
+                    styles.languageOptionText,
+                    selectedLanguages.includes(language) &&
+                      styles.languageOptionTextSelected,
+                  ]}
+                >
+                  {language}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+          <TouchableOpacity
+            onPress={onClose}
+            style={[styles.modalButton, styles.cancelButton]}
+          >
+            <Text style={styles.cancelButtonText}>Close</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+};
+
 export default function EditProfileScreen() {
   const [user, setUser] = useState<any>(null);
 
@@ -217,6 +439,12 @@ export default function EditProfileScreen() {
   const [isUploading, setIsUploading] = useState(false);
 
   const [isUpdatingLocation, setIsUpdatingLocation] = useState(false);
+
+  const [toast, setToast] = useState({ visible: false, message: '', type: 'info' as 'success' | 'error' | 'info' });
+
+  const showToast = (message: string, type: 'success' | 'error' | 'info') => {
+    setToast({ visible: true, message, type });
+  };
 
   const [name, setName] = useState("");
 
@@ -240,7 +468,11 @@ export default function EditProfileScreen() {
 
   const [isInterestModalVisible, setInterestModalVisible] = useState(false);
 
+  const [isInterestSelectorVisible, setInterestSelectorVisible] = useState(false);
+
   const [isLanguageModalVisible, setLanguageModalVisible] = useState(false);
+
+  const [isLanguageSelectorVisible, setLanguageSelectorVisible] = useState(false);
 
   const [isPronounModalVisible, setPronounModalVisible] = useState(false);
 
@@ -327,16 +559,16 @@ export default function EditProfileScreen() {
       };
       const typedResponse = response as UpdateProfileResponse;
       if (typedResponse.success) {
-        Alert.alert("Success", "Profile updated successfully");
+        showToast("Profile updated successfully! 🎉", "success");
         const updatedUser = typedResponse.data.user;
         setUser((prevUser: any) => ({ ...prevUser, ...updatedUser }));
       } else {
-        Alert.alert("Error", typedResponse.message || "Update failed");
+        showToast(typedResponse.message || "Update failed", "error");
       }
     } catch (error: any) {
       console.error("Update profile error:", error);
 
-      Alert.alert("Error", error.message || "Update failed");
+      showToast(error.message || "Update failed", "error");
     } finally {
       setUpdating(false);
     }
@@ -373,16 +605,13 @@ export default function EditProfileScreen() {
         photoData as any
       )) as UploadPhotoResponse;
       if (response.success) {
-        Alert.alert("Success", "Photo uploaded successfully");
+        showToast("Photo uploaded successfully! 📸", "success");
         await fetchProfile();
       } else {
-        Alert.alert(
-          "Upload failed",
-          response.message || "Could not upload photo"
-        );
+        showToast(response.message || "Could not upload photo", "error");
       }
     } catch (error: any) {
-      Alert.alert("Error", error.message || "An error occurred during upload");
+      showToast(error.message || "An error occurred during upload", "error");
     } finally {
       setIsUploading(false);
     }
@@ -437,21 +666,18 @@ export default function EditProfileScreen() {
         payload
       )) as UpdateLocationResponse;
       if (response.success) {
-        Alert.alert("Success", "Location updated successfully");
+        showToast("Location updated successfully! 📍", "success");
         setLocation(response.data.location.city);
         setUser((prevUser: any) => ({
           ...prevUser,
           location: response.data.location,
         }));
       } else {
-        Alert.alert(
-          "Update failed",
-          response.message || "Could not update location"
-        );
+        showToast(response.message || "Could not update location", "error");
       }
     } catch (error: any) {
       console.error("Update location error:", error);
-      Alert.alert("Error", error.message || "Failed to update location");
+      showToast(error.message || "Failed to update location", "error");
     } finally {
       setIsUpdatingLocation(false);
     }
@@ -459,7 +685,7 @@ export default function EditProfileScreen() {
 
   const handleAddInterest = (interest: string) => {
     if (interest && !interests.includes(interest)) {
-      setInterests([...interests, interest]);
+      setInterests((prevInterests) => [...prevInterests, interest]);
     }
 
     setInterestModalVisible(false);
@@ -471,7 +697,7 @@ export default function EditProfileScreen() {
 
   const handleAddLanguage = (language: string) => {
     if (language && !languages.includes(language)) {
-      setLanguages([...languages, language]);
+      setLanguages((prevLanguages) => [...prevLanguages, language]);
     }
 
     setLanguageModalVisible(false);
@@ -522,20 +748,33 @@ export default function EditProfileScreen() {
   return (
     <>
       <Stack.Screen options={{ title: "Edit Profile" }} />
+      
+      <ToastNotification
+        visible={toast.visible}
+        message={toast.message}
+        type={toast.type}
+        onHide={() => setToast({ ...toast, visible: false })}
+      />
 
       <ScrollView
         style={styles.container}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 50 }}
       >
-        <View style={styles.section}>
-          <Text style={styles.completionText}>
-            Profile completion: {completion}%
-          </Text>
+        <View style={styles.completionCard}>
+          <View style={styles.completionHeader}>
+            <Ionicons name="checkmark-circle" size={24} color={COLORS.primary} />
+            <Text style={styles.completionText}>
+              Profile completion: {completion}%
+            </Text>
+          </View>
 
           <View style={styles.progressBarBackground}>
-            <View
+            <LinearGradient
+              colors={COLORS.gradient1 as any}
               style={[styles.progressBarFill, { width: `${completion}%` }]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
             />
           </View>
         </View>
@@ -558,6 +797,7 @@ export default function EditProfileScreen() {
               style={styles.mainPhotoContainer}
               onPress={handleUploadPhoto}
               disabled={isUploading}
+              activeOpacity={0.8}
             >
               <Image
                 source={{
@@ -567,11 +807,25 @@ export default function EditProfileScreen() {
                 }}
                 style={styles.mainPhoto}
               />
-
+              {mainPhotoSlot && (
+                <LinearGradient
+                  colors={['transparent', 'rgba(0,0,0,0.3)']}
+                  style={styles.photoGradient}
+                >
+                  <View style={styles.mainPhotoIcon}>
+                    <Ionicons name="camera" size={24} color={COLORS.white} />
+                    <Text style={styles.mainPhotoLabel}>Main Photo</Text>
+                  </View>
+                </LinearGradient>
+              )}
               {!mainPhotoSlot && (
-                <View style={styles.addPhotoOverlay}>
-                  <Feather name="plus" size={30} color={COLORS.primary} />
-                </View>
+                <LinearGradient
+                  colors={COLORS.gradient2 as any}
+                  style={styles.addPhotoOverlay}
+                >
+                  <Ionicons name="person-add" size={40} color={COLORS.white} />
+                  <Text style={styles.addPhotoText}>Add Main Photo</Text>
+                </LinearGradient>
               )}
             </TouchableOpacity>
 
@@ -582,18 +836,22 @@ export default function EditProfileScreen() {
                   key={index}
                   onPress={handleUploadPhoto}
                   disabled={isUploading}
+                  activeOpacity={0.8}
                 >
                   {photo ? (
-                    <Image
-                      source={{ uri: photo.url }}
-                      style={styles.subPhoto}
-                    />
+                    <>
+                      <Image
+                        source={{ uri: photo.url }}
+                        style={styles.subPhoto}
+                      />
+                      <View style={styles.subPhotoOverlay}>
+                        <Ionicons name="image" size={16} color={COLORS.white} />
+                      </View>
+                    </>
                   ) : (
-                    <Feather
-                      name="plus"
-                      size={24}
-                      color={COLORS.textSecondary}
-                    />
+                    <View style={styles.emptyPhotoBox}>
+                      <Ionicons name="add-circle-outline" size={28} color={COLORS.primary} />
+                    </View>
                   )}
                 </TouchableOpacity>
               ))}
@@ -807,7 +1065,7 @@ export default function EditProfileScreen() {
                 style={styles.rowIcon}
               />
             }
-            onPress={() => setInterestModalVisible(true)}
+            onPress={() => setInterestSelectorVisible(true)}
           />
 
           <View style={styles.pillContainer}>
@@ -834,7 +1092,7 @@ export default function EditProfileScreen() {
                 style={styles.rowIcon}
               />
             }
-            onPress={() => setLanguageModalVisible(true)}
+            onPress={() => setLanguageSelectorVisible(true)}
           />
 
           <View style={styles.pillContainer}>
@@ -847,6 +1105,8 @@ export default function EditProfileScreen() {
             ))}
           </View>
         </View>
+
+        
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Linked accounts</Text>
@@ -889,13 +1149,25 @@ export default function EditProfileScreen() {
         </View>
 
         <TouchableOpacity
-          style={styles.updateButton}
           onPress={handleUpdateProfile}
           disabled={updating || isUploading || isUpdatingLocation}
+          activeOpacity={0.8}
         >
-          <Text style={styles.updateButtonText}>
-            {updating ? "Saving..." : "Save Changes"}
-          </Text>
+          <LinearGradient
+            colors={COLORS.gradient1 as any}
+            style={styles.updateButton}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+          >
+            {updating ? (
+              <ActivityIndicator size="small" color={COLORS.white} />
+            ) : (
+              <>
+                <Ionicons name="checkmark-circle" size={20} color={COLORS.white} />
+                <Text style={styles.updateButtonText}>Save Changes</Text>
+              </>
+            )}
+          </LinearGradient>
         </TouchableOpacity>
       </ScrollView>
 
@@ -923,19 +1195,74 @@ export default function EditProfileScreen() {
         currentValue={pronouns}
         title="Select Pronouns"
       />
+
+      <LanguageSelectorModal
+        visible={isLanguageSelectorVisible}
+        onClose={() => setLanguageSelectorVisible(false)}
+        onSelect={handleAddLanguage}
+        selectedLanguages={languages}
+      />
+      
+      <InterestSelectorModal
+        visible={isInterestSelectorVisible}
+        onClose={() => setInterestSelectorVisible(false)}
+        onSelect={handleAddInterest}
+        selectedInterests={interests}
+      />
     </>
   );
 }
 
+
+
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.white, paddingHorizontal: 20 },
+  container: { flex: 1, backgroundColor: COLORS.lightGray, paddingHorizontal: 20 },
   section: { marginTop: 24 },
-  sectionTitle: { fontSize: 20, fontWeight: "700", color: COLORS.text },
+  sectionTitle: { fontSize: 20, fontWeight: "700", color: COLORS.text, marginBottom: 4 },
   sectionSubtitle: {
     fontSize: 14,
     color: COLORS.textSecondary,
     marginTop: 4,
     marginBottom: 16,
+  },
+  toastContainer: {
+    position: 'absolute',
+    top: 50,
+    left: 20,
+    right: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 12,
+    zIndex: 9999,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 10,
+  },
+  toastText: {
+    color: COLORS.white,
+    fontSize: 15,
+    fontWeight: '600',
+    marginLeft: 12,
+    flex: 1,
+  },
+  completionCard: {
+    backgroundColor: COLORS.white,
+    borderRadius: 16,
+    padding: 20,
+    marginTop: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  completionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
   },
   loadingOverlay: {
     ...StyleSheet.absoluteFillObject,
@@ -947,23 +1274,22 @@ const styles = StyleSheet.create({
   },
   completionText: {
     fontSize: 16,
-    fontWeight: "600",
+    fontWeight: "700",
     color: COLORS.text,
-    marginBottom: 8,
+    marginLeft: 10,
   },
   progressBarBackground: {
-    height: 8,
-    backgroundColor: COLORS.lightGray,
-    borderRadius: 4,
+    height: 10,
+    backgroundColor: COLORS.gray,
+    borderRadius: 10,
     overflow: "hidden",
   },
   progressBarFill: {
     height: "100%",
-    backgroundColor: COLORS.primary,
-    borderRadius: 4,
+    borderRadius: 10,
   },
 
-  photoGrid: { flexDirection: "row", height: 420 },
+  photoGrid: { flexDirection: "row", height: 420, marginTop: 16 },
   mainPhotoContainer: {
     flex: 0.6,
     paddingRight: 8,
@@ -973,8 +1299,29 @@ const styles = StyleSheet.create({
   mainPhoto: {
     width: "100%",
     height: "100%",
-    borderRadius: 12,
+    borderRadius: 16,
     backgroundColor: COLORS.lightGray,
+  },
+  photoGradient: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 80,
+    borderBottomLeftRadius: 16,
+    borderBottomRightRadius: 16,
+    justifyContent: 'flex-end',
+    padding: 12,
+  },
+  mainPhotoIcon: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  mainPhotoLabel: {
+    color: COLORS.white,
+    fontSize: 14,
+    fontWeight: '600',
+    marginLeft: 8,
   },
   addPhotoOverlay: {
     position: "absolute",
@@ -982,6 +1329,13 @@ const styles = StyleSheet.create({
     height: "100%",
     justifyContent: "center",
     alignItems: "center",
+    borderRadius: 16,
+  },
+  addPhotoText: {
+    color: COLORS.white,
+    fontSize: 16,
+    fontWeight: '600',
+    marginTop: 8,
   },
   subPhotoContainer: {
     flex: 0.4,
@@ -994,35 +1348,52 @@ const styles = StyleSheet.create({
   addPhotoBox: {
     width: "100%",
     height: "32%",
-    backgroundColor: COLORS.lightGray,
+    backgroundColor: COLORS.white,
     borderRadius: 12,
     justifyContent: "center",
     alignItems: "center",
-    borderWidth: 1,
+    borderWidth: 2,
     borderColor: COLORS.gray,
     borderStyle: "dashed",
     overflow: "hidden",
     marginBottom: "2%",
+    position: 'relative',
   },
   subPhoto: { width: "100%", height: "100%", borderRadius: 12 },
+  subPhotoOverlay: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderRadius: 12,
+    padding: 4,
+  },
+  emptyPhotoBox: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   textInput: {
     height: 120,
-    backgroundColor: COLORS.lightGray,
+    backgroundColor: COLORS.white,
     borderRadius: 12,
     padding: 16,
     fontSize: 16,
     color: COLORS.text,
     textAlignVertical: "top",
     marginBottom: 16,
+    borderWidth: 1,
+    borderColor: COLORS.gray,
   },
   input: {
     height: 50,
-    backgroundColor: COLORS.lightGray,
+    backgroundColor: COLORS.white,
     borderRadius: 12,
     paddingHorizontal: 16,
     fontSize: 16,
     color: COLORS.text,
     marginBottom: 12,
+    borderWidth: 1,
+    borderColor: COLORS.gray,
   },
   inputLabel: {
     fontSize: 14,
@@ -1034,9 +1405,11 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     height: 50,
-    backgroundColor: COLORS.lightGray,
+    backgroundColor: COLORS.white,
     borderRadius: 12,
     marginBottom: 12,
+    borderWidth: 1,
+    borderColor: COLORS.gray,
   },
   locationInput: {
     flex: 1,
@@ -1049,36 +1422,65 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.gray,
+    paddingHorizontal: 12,
+    backgroundColor: COLORS.white,
+    borderRadius: 12,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: COLORS.gray,
   },
-  rowIcon: { marginRight: 16, width: 20, textAlign: "center" },
-  rowLabel: { flex: 1, fontSize: 16, color: COLORS.text },
-  rowValue: { fontSize: 16, color: COLORS.textSecondary, marginRight: 8 },
+  rowIconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: COLORS.secondary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  rowIcon: { width: 20, textAlign: "center" },
+  rowLabel: { flex: 1, fontSize: 16, color: COLORS.text, fontWeight: '500' },
+  rowValue: { fontSize: 15, color: COLORS.textSecondary, marginRight: 8 },
   dropdown: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: COLORS.lightGray,
+    backgroundColor: COLORS.white,
     padding: 16,
     borderRadius: 12,
+    borderWidth: 1,
+    borderColor: COLORS.gray,
   },
-  dropdownText: { flex: 1, fontSize: 16, color: COLORS.text },
+  dropdownText: { flex: 1, fontSize: 16, color: COLORS.text, marginLeft: 8 },
   pillContainer: { flexDirection: "row", flexWrap: "wrap", marginTop: 12 },
   pill: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: COLORS.secondary,
+    backgroundColor: COLORS.primary,
     borderRadius: 20,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
+    paddingVertical: 8,
+    paddingLeft: 16,
+    paddingRight: 8,
     marginRight: 8,
     marginBottom: 8,
+    shadowColor: COLORS.shadow,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 2,
   },
   pillText: {
     fontSize: 14,
-    color: COLORS.primary,
+    color: COLORS.white,
     fontWeight: "600",
-    marginRight: 6,
+    marginRight: 8,
+  },
+  pillRemove: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   modalContainer: {
     flex: 1,
@@ -1117,13 +1519,19 @@ const styles = StyleSheet.create({
   addButton: { backgroundColor: COLORS.primary },
   addButtonText: { color: COLORS.white, fontWeight: "bold" },
   updateButton: {
-    backgroundColor: COLORS.primary,
+    flexDirection: 'row',
     paddingVertical: 16,
     borderRadius: 12,
     alignItems: "center",
+    justifyContent: 'center',
     marginTop: 32,
+    shadowColor: COLORS.shadow,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
   },
-  updateButtonText: { color: COLORS.white, fontSize: 16, fontWeight: "700" },
+  updateButtonText: { color: COLORS.white, fontSize: 16, fontWeight: "700", marginLeft: 8 },
   pronounOption: {
     width: "100%",
     paddingVertical: 15,
@@ -1140,4 +1548,25 @@ const styles = StyleSheet.create({
   pronounOptionText: { fontSize: 16, color: COLORS.text },
   pronounOptionTextSelected: { color: COLORS.white, fontWeight: "bold" },
   inputText: { fontSize: 16 },
+  languageOption: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: COLORS.gray,
+    marginBottom: 8,
+    alignItems: "center",
+  },
+  languageOptionSelected: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+  },
+  languageOptionText: {
+    fontSize: 16,
+    color: COLORS.text,
+  },
+  languageOptionTextSelected: {
+    color: COLORS.white,
+    fontWeight: "bold",
+},
 });

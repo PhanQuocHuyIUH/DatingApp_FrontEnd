@@ -1,5 +1,5 @@
 import { router } from "expo-router";
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   StyleSheet,
   Text,
@@ -11,10 +11,71 @@ import {
   Alert,
   ActivityIndicator,
   Platform,
+  Animated,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { LinearGradient } from 'expo-linear-gradient';
 import { authService } from "../../services/authService";
+
+// Custom Toast Component
+const CustomToast = ({ visible, message, type, onHide }: { visible: boolean; message: string; type: 'success' | 'error' | 'info'; onHide: () => void }) => {
+  const translateY = useRef(new Animated.Value(-100)).current;
+  const opacity = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (visible) {
+      Animated.parallel([
+        Animated.timing(translateY, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.timing(opacity, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+      ]).start();
+
+      setTimeout(() => {
+        Animated.parallel([
+          Animated.timing(translateY, {
+            toValue: -100,
+            duration: 300,
+            useNativeDriver: true,
+          }),
+          Animated.timing(opacity, {
+            toValue: 0,
+            duration: 300,
+            useNativeDriver: true,
+          }),
+        ]).start(() => onHide());
+      }, 3000);
+    }
+  }, [visible, translateY, opacity, onHide]);
+
+  if (!visible) return null;
+
+  const bgColor = type === 'error' ? '#EF4444' : type === 'success' ? '#10B981' : '#3B82F6';
+  const icon = type === 'error' ? 'close-circle' : type === 'success' ? 'checkmark-circle' : 'information-circle';
+
+  return (
+    <Animated.View
+      style={[
+        styles.toastContainer,
+        {
+          backgroundColor: bgColor,
+          transform: [{ translateY }],
+          opacity,
+        },
+      ]}
+    >
+      <Ionicons name={icon} size={24} color="white" />
+      <Text style={styles.toastText}>{message}</Text>
+    </Animated.View>
+  );
+};
 
 const COLORS = {
   primary: "#b21e46",
@@ -35,34 +96,52 @@ export default function RegisterScreen() {
     confirmPassword: "",
     dateOfBirth: new Date(2000, 0, 1),
     gender: "",
-    location: "",
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [toast, setToast] = useState<{ visible: boolean; message: string; type: 'success' | 'error' | 'info' }>({ visible: false, message: '', type: 'info' });
+  
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 600,
+      useNativeDriver: true,
+    }).start();
+  }, [fadeAnim]);
+
+  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    setToast({ visible: true, message, type });
+  };
+
+  const hideToast = () => {
+    setToast({ ...toast, visible: false });
+  };
 
   const handleRegister = async () => {
     // Validation
     if (!formData.name || !formData.email || !formData.password || !formData.gender) {
-      Alert.alert("Error", "Please fill in all required fields");
+      showToast("Please fill in all required fields", "error");
       return;
     }
 
     if (formData.password !== formData.confirmPassword) {
-      Alert.alert("Error", "Passwords do not match");
+      showToast("Passwords do not match", "error");
       return;
     }
 
     if (formData.password.length < 6) {
-      Alert.alert("Error", "Password must be at least 6 characters");
+      showToast("Password must be at least 6 characters", "error");
       return;
     }
 
     // Check age
     const age = new Date().getFullYear() - formData.dateOfBirth.getFullYear();
     if (age < 18) {
-      Alert.alert("Error", "You must be at least 18 years old");
+      showToast("You must be at least 18 years old", "error");
       return;
     }
 
@@ -75,23 +154,20 @@ export default function RegisterScreen() {
         password: formData.password,
         dateOfBirth: formData.dateOfBirth.toISOString(),
         gender: formData.gender,
-        location: formData.location,
       });
 
-      Alert.alert("Success", result.message, [
-        {
-          text: "OK",
-          onPress: () => router.replace("/(main)"),
-        },
-      ]);
-    } catch (error) {
-      Alert.alert("Error", error.message || "Registration failed");
+      showToast("Account created successfully! 🎉", "success");
+      setTimeout(() => {
+        router.replace("/(main)");
+      }, 1500);
+    } catch (error: any) {
+      showToast(error.message || "Registration failed", "error");
     } finally {
       setLoading(false);
     }
   };
 
-  const onDateChange = (event, selectedDate) => {
+  const onDateChange = (event: any, selectedDate?: Date) => {
     setShowDatePicker(Platform.OS === 'ios');
     if (selectedDate) {
       setFormData({ ...formData, dateOfBirth: selectedDate });
@@ -100,7 +176,17 @@ export default function RegisterScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+      <CustomToast
+        visible={toast.visible}
+        message={toast.message}
+        type={toast.type}
+        onHide={hideToast}
+      />
+      <LinearGradient
+        colors={['#ffffff', '#fef5f7', '#fce9ed']}
+        style={styles.gradientBackground}
+      >
+        <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
@@ -110,7 +196,11 @@ export default function RegisterScreen() {
         </View>
 
         {/* Form */}
-        <View style={styles.formContainer}>
+        <Animated.View style={[styles.formContainer, { opacity: fadeAnim }]}>
+          <LinearGradient
+            colors={['#ffffff', '#fefefe']}
+            style={styles.formCard}
+          >
           {/* Name */}
           <View style={styles.inputContainer}>
             <Text style={styles.label}>Full Name *</Text>
@@ -216,6 +306,12 @@ export default function RegisterScreen() {
                 ]}
                 onPress={() => setFormData({ ...formData, gender: "male" })}
               >
+                <Ionicons
+                  name="male"
+                  size={20}
+                  color={formData.gender === "male" ? COLORS.white : COLORS.text}
+                  style={{ marginRight: 4 }}
+                />
                 <Text
                   style={[
                     styles.genderText,
@@ -232,6 +328,12 @@ export default function RegisterScreen() {
                 ]}
                 onPress={() => setFormData({ ...formData, gender: "female" })}
               >
+                <Ionicons
+                  name="female"
+                  size={20}
+                  color={formData.gender === "female" ? COLORS.white : COLORS.text}
+                  style={{ marginRight: 4 }}
+                />
                 <Text
                   style={[
                     styles.genderText,
@@ -248,6 +350,12 @@ export default function RegisterScreen() {
                 ]}
                 onPress={() => setFormData({ ...formData, gender: "other" })}
               >
+                <Ionicons
+                  name="transgender"
+                  size={20}
+                  color={formData.gender === "other" ? COLORS.white : COLORS.text}
+                  style={{ marginRight: 4 }}
+                />
                 <Text
                   style={[
                     styles.genderText,
@@ -258,17 +366,6 @@ export default function RegisterScreen() {
                 </Text>
               </TouchableOpacity>
             </View>
-          </View>
-
-          {/* Location */}
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Location (Optional)</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Enter your location"
-              value={formData.location}
-              onChangeText={(text) => setFormData({ ...formData, location: text })}
-            />
           </View>
 
           {/* Register Button */}
@@ -291,8 +388,10 @@ export default function RegisterScreen() {
               <Text style={styles.loginLink}>Login</Text>
             </TouchableOpacity>
           </View>
-        </View>
+          </LinearGradient>
+        </Animated.View>
       </ScrollView>
+      </LinearGradient>
     </SafeAreaView>
   );
 }
@@ -302,9 +401,45 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.white,
   },
+  gradientBackground: {
+    flex: 1,
+  },
+  toastContainer: {
+    position: 'absolute',
+    top: 50,
+    left: 20,
+    right: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    zIndex: 1000,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 10,
+  },
+  toastText: {
+    color: 'white',
+    fontSize: 15,
+    fontWeight: '600',
+    marginLeft: 12,
+    flex: 1,
+  },
   scrollView: {
     flex: 1,
     paddingHorizontal: 24,
+  },
+  formCard: {
+    borderRadius: 24,
+    padding: 20,
+    shadowColor: '#b21e46',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 5,
   },
   header: {
     flexDirection: "row",
@@ -333,13 +468,14 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   input: {
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: COLORS.border,
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 14,
     fontSize: 16,
     color: COLORS.text,
+    backgroundColor: '#fafafa',
   },
   passwordContainer: {
     flexDirection: "row",
@@ -375,16 +511,24 @@ const styles = StyleSheet.create({
   },
   genderButton: {
     flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'center',
     paddingVertical: 14,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: COLORS.border,
     borderRadius: 12,
     marginHorizontal: 4,
     alignItems: "center",
+    backgroundColor: '#fafafa',
   },
   genderButtonActive: {
     backgroundColor: COLORS.primary,
     borderColor: COLORS.primary,
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
   },
   genderText: {
     fontSize: 16,
