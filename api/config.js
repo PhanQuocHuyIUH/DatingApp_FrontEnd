@@ -1,8 +1,8 @@
-import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import axios from 'axios';
 
 // Thay đổi URL này theo địa chỉ backend của bạn
-const API_URL = 'http://192.168.1.7:3000/api'; // Hoặc IP máy của bạn: http://192.168.1.x:5000/api
+const API_URL = "https://datingapp-backend-0khx.onrender.com/api"; // Hoặc IP máy của bạn: http://192.168.1.x:5000/api
 
 const api = axios.create({
     baseURL: API_URL,
