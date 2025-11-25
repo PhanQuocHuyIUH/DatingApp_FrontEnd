@@ -1,20 +1,20 @@
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { LinearGradient } from 'expo-linear-gradient';
 import { router } from "expo-router";
-import React, { useState, useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
+  ActivityIndicator,
+  Alert,
+  Animated,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  SafeAreaView,
   StyleSheet,
   Text,
   TextInput,
-  Pressable,
   View,
-  SafeAreaView,
-  Alert,
-  ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
-  Animated,
 } from "react-native";
-import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import { LinearGradient } from 'expo-linear-gradient';
 import { authService } from "../../services/authService";
 
 // Animated Cupid Component - Baby angel with bow and arrow
@@ -329,7 +329,7 @@ export default function LoginScreen() {
         >
           {/* Header */}
           <View style={styles.header}>
-          <Pressable onPress={() => router.back()} style={styles.backButton}>
+          <Pressable onPress={() => router.push("/(auth)")} style={styles.backButton}>
             <Ionicons name="arrow-back" size={24} color={COLORS.text} />
           </Pressable>
           <Text style={styles.title}>Welcome Back</Text>

@@ -1,38 +1,35 @@
+import {
+  Ionicons,
+} from "@expo/vector-icons";
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useHeaderHeight } from '@react-navigation/elements';
+import { LinearGradient } from 'expo-linear-gradient';
+import { router, Stack, useLocalSearchParams } from "expo-router";
+import { StatusBar } from "expo-status-bar";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  ScrollView,
-  View,
-  Text,
-  StyleSheet,
-  Image,
-  TouchableOpacity,
-  TextInput,
-  Platform,
-  KeyboardAvoidingView,
   Dimensions,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
-import { LinearGradient } from 'expo-linear-gradient';
-import { Stack, useLocalSearchParams, router } from "expo-router";
-import {
-  Feather,
-  Ionicons,
-  FontAwesome,
-  MaterialCommunityIcons,
-  MaterialIcons,
-} from "@expo/vector-icons";
-import { StatusBar } from "expo-status-bar";
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { chatService } from "../../../services/chatService";
 import { socketService } from "../../../services/socketService";
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useHeaderHeight } from '@react-navigation/elements';
+import { aiService } from "../../../services/aiService";
 
 const { width } = Dimensions.get('window');
 
 // --- Bảng màu Hiện đại (Modern Palette) ---
 const COLORS = {
   primary: "#E94057", // Đỏ hồng hiện đại hơn
-  primaryGradient: ['#E94057', '#F27121'], // Gradient cam-hồng ấm áp
+  primaryGradient: ['#E94057', '#F27121'] as const, // Gradient cam-hồng ấm áp
   secondary: "#F3F4F6",
   text: "#111827",
   textSecondary: "#6B7280",
@@ -41,7 +38,10 @@ const COLORS = {
   border: "#E5E7EB",
   inputBackground: "#F3F4F6",
   myMessageText: "#FFFFFF",
-  superLikeGradient: ['#4FACFE', '#00F2FE'],
+  superLikeGradient: ['#4FACFE', '#00F2FE'] as const,
+  purple: "#A855F7",
+  blue: "#3B82F6",
+  green: "#10B981",
 };
 
 type ChatMessage = {
@@ -53,6 +53,13 @@ type ChatMessage = {
   type?: string;
   mediaUrl?: string;
   createdAt?: string;
+};
+
+type AISuggestion = {
+  text: string;
+  style: string;
+  emoji?: string;
+  basedOn?: string;
 };
 
 // --- Component Hiển thị ngày/giờ (Time Pill) ---
@@ -97,6 +104,100 @@ const TheirMessageBubble = ({ text, time, avatar }: { text: string; time: string
   </View>
 );
 
+// --- AI Suggestions Panel Component ---
+const AISuggestionsPanel = ({ 
+  suggestions, 
+  onSelectSuggestion, 
+  onRefresh, 
+  loading, 
+  isIceBreaker = false 
+}: { 
+  suggestions: AISuggestion[]; 
+  onSelectSuggestion: (text: string) => void; 
+  onRefresh: () => void; 
+  loading: boolean; 
+  isIceBreaker?: boolean;
+}) => {
+  const getStyleColor = (style: string) => {
+    switch (style) {
+      case 'friendly': return COLORS.green;
+      case 'humorous':
+      case 'playful': return COLORS.blue;
+      case 'flirty':
+      case 'charming': return COLORS.purple;
+      default: return COLORS.primary;
+    }
+  };
+
+  const getStyleIcon = (style: string) => {
+    switch (style) {
+      case 'friendly': return 'happy-outline';
+      case 'humorous':
+      case 'playful': return 'chatbubble-ellipses-outline';
+      case 'flirty':
+      case 'charming': return 'heart-outline';
+      default: return 'chatbubbles-outline';
+    }
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.aiContainer}>
+        <View style={styles.aiLoadingContainer}>
+          <Text style={styles.aiLoadingText}>AI đang tạo gợi ý...</Text>
+        </View>
+      </View>
+    );
+  }
+
+  if (suggestions.length === 0) return null;
+
+  return (
+    <View style={styles.aiContainer}>
+      <View style={styles.aiHeader}>
+        <View style={styles.aiHeaderLeft}>
+          <LinearGradient colors={['#A855F7', '#EC4899']} style={styles.aiIcon}>
+            <Ionicons name="sparkles" size={14} color="white" />
+          </LinearGradient>
+          <Text style={styles.aiHeaderTitle}>
+            {isIceBreaker ? 'Câu mở đầu gợi ý' : 'AI gợi ý'}
+          </Text>
+        </View>
+        <TouchableOpacity onPress={onRefresh} style={styles.aiRefreshButton}>
+          <Ionicons name="refresh" size={18} color={COLORS.textSecondary} />
+        </TouchableOpacity>
+      </View>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.aiSuggestionsContainer}
+      >
+        {suggestions.map((suggestion, index) => (
+          <TouchableOpacity
+            key={index}
+            style={styles.aiSuggestionCard}
+            onPress={() => onSelectSuggestion(suggestion.text)}
+            activeOpacity={0.7}
+          >
+            <View style={styles.aiSuggestionHeader}>
+              <View style={[styles.aiStyleIndicator, { backgroundColor: getStyleColor(suggestion.style) }]}>
+                <Ionicons name={getStyleIcon(suggestion.style) as any} size={12} color="white" />
+              </View>
+              <Text style={styles.aiStyleText}>{suggestion.emoji}</Text>
+            </View>
+            <Text style={styles.aiSuggestionText} numberOfLines={3}>
+              {suggestion.text}
+            </Text>
+            {suggestion.basedOn && (
+              <Text style={styles.aiBasedOnText}>Dựa trên {suggestion.basedOn}</Text>
+            )}
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+    </View>
+  );
+};
+
 // --- Màn hình chính ---
 export default function ChatScreen() {
   const { chatId, matchId, userName, userAge, avatar, userId, isSuperLike } = useLocalSearchParams<{ chatId: string; matchId?: string; userName?: string; userAge?: string; avatar?: string; userId?: string; isSuperLike?: string }>();
@@ -109,6 +210,12 @@ export default function ChatScreen() {
   const scrollRef = useRef<ScrollView>(null);
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
+
+  // AI Suggestions State
+  const [showAISuggestions, setShowAISuggestions] = useState(false);
+  const [aiSuggestions, setAISuggestions] = useState<AISuggestion[]>([]);
+  const [aiLoading, setAILoading] = useState(false);
+  const [isIceBreaker, setIsIceBreaker] = useState(false);
 
   // ... (Giữ nguyên logic socket/load message cũ của bạn để đảm bảo chức năng không đổi) ...
   const headerUser = useMemo(() => ({
@@ -147,6 +254,51 @@ export default function ChatScreen() {
     }
   }, [messages]);
 
+  // Load AI Suggestions
+  const loadAISuggestions = useCallback(async () => {
+    if (!chatId) return;
+    
+    setAILoading(true);
+    try {
+      let response;
+      
+      if (messages.length === 0 && matchId) {
+        console.log('🤖 Loading ice breakers...');
+        response = await aiService.getIceBreakerSuggestions(matchId);
+        setIsIceBreaker(true);
+      } else {
+        console.log('🤖 Loading chat suggestions...');
+        response = await aiService.getChatSuggestions(chatId, 15);
+        setIsIceBreaker(false);
+      }
+
+      if (response?.success && response?.data?.suggestions) {
+        setAISuggestions(response.data.suggestions);
+      }
+    } catch (error) {
+      console.error('❌ AI suggestions error:', error);
+      setAISuggestions([]);
+    } finally {
+      setAILoading(false);
+    }
+  }, [chatId, matchId, messages.length]);
+
+  const toggleAISuggestions = () => {
+    if (!showAISuggestions) {
+      loadAISuggestions();
+    }
+    setShowAISuggestions(!showAISuggestions);
+  };
+
+  const handleSelectSuggestion = (text: string) => {
+    setMessage(text);
+    setShowAISuggestions(false);
+  };
+
+  const refreshSuggestions = () => {
+    loadAISuggestions();
+  };
+
   // Logic Socket giữ nguyên như cũ...
   useEffect(() => {
     let mounted = true;
@@ -157,16 +309,41 @@ export default function ChatScreen() {
           const u = JSON.parse(userStr);
           setCurrentUserId(u?.id || u?._id || null);
         }
-        const sock = await socketService.init();
+        await socketService.init();
         if (chatId) socketService.joinConversation(chatId);
         
         socketService.onNewMessage((payload:any) => {
           const convId = payload?.conversationId?.toString();
           if (convId !== chatId?.toString()) return;
           const msg = payload.message;
-          if (!msg) return;
+          if (!msg) {
+            console.log('❌ No message in payload');
+            return;
+          }
+          
+          console.log('✅ Processing message:', msg);
           if (!mounted) return;
+          
           setMessages(prev => {
+            // Check if sender is current user (this is our sent message)
+            const msgSenderId = msg.sender?._id || msg.sender?.id || msg.sender;
+            if (msgSenderId === currentUserId) {
+              console.log('📤 This is our sent message, replacing optimistic');
+              // Replace optimistic message with real one
+              const hasOptimistic = prev.some(m => m._id?.toString().startsWith('optimistic-'));
+              if (hasOptimistic) {
+                return prev.map(m => 
+                  m._id?.toString().startsWith('optimistic-') ? msg : m
+                );
+              }
+              // If no optimistic (e.g. sent from another device), check duplicate
+              const exists = prev.find(m => (m._id || m.id) === (msg._id || msg.id));
+              if (exists) return prev;
+              return [...prev, msg];
+            }
+            
+            // Message from other user - check duplicate and add
+            console.log('📥 Message from other user');
             const exists = prev.find(m => (m._id || m.id) === (msg._id || msg.id));
             if (exists) return prev;
             return [...prev, msg];
@@ -182,7 +359,27 @@ export default function ChatScreen() {
             if (mounted) setTyping(data.isTyping);
           }
         });
-      } catch (err) { console.error(err); }
+        
+        socketService.onReadReceipt((data:any) => {
+          console.log('📖 Read receipt received:', data);
+          if (data?.conversationId === chatId) {
+            // Update messages read status if needed
+            setMessages(prev => prev.map(m => {
+              if (m._id === data.messageId) {
+                return { ...m, isRead: true };
+              }
+              return m;
+            }));
+          }
+        });
+        
+        // Mark conversation as entered (clear unread on backend)
+        if (chatId) {
+          socketService.emitRead({ conversationId: String(chatId) });
+        }
+      } catch (err) {
+        console.error('❌ Socket setup error:', err);
+      }
     })();
     return () => {
       mounted = false;
@@ -210,6 +407,8 @@ export default function ChatScreen() {
       
       <Stack.Screen
         options={{
+          headerShown: true,
+          headerBackVisible: true,
           headerShadowVisible: false, // Xóa shadow mặc định của header
           headerTitle: () => (
             <View style={styles.headerTitleContainer}>
@@ -298,9 +497,37 @@ export default function ChatScreen() {
           </View>
         )}
 
+        {/* AI Suggestions Panel */}
+        {showAISuggestions && (
+          <AISuggestionsPanel
+            suggestions={aiSuggestions}
+            onSelectSuggestion={handleSelectSuggestion}
+            onRefresh={refreshSuggestions}
+            loading={aiLoading}
+            isIceBreaker={isIceBreaker}
+          />
+        )}
+
         {/* --- Thanh Nhập liệu Mới --- */}
         <View style={[styles.inputWrapper, { paddingBottom: Platform.OS === 'ios' ? insets.bottom : 16 }]}>
           <View style={styles.inputBar}>
+            {/* AI Button */}
+            <TouchableOpacity 
+              style={styles.aiButton}
+              onPress={toggleAISuggestions}
+            >
+              <LinearGradient
+                colors={showAISuggestions ? ['#A855F7', '#EC4899'] : ['#E5E7EB', '#E5E7EB']}
+                style={styles.aiButtonGradient}
+              >
+                <Ionicons 
+                  name="sparkles" 
+                  size={18} 
+                  color={showAISuggestions ? 'white' : COLORS.textSecondary} 
+                />
+              </LinearGradient>
+            </TouchableOpacity>
+
             {/* Add Attachment Button */}
             <TouchableOpacity style={styles.attachButton}>
                <Ionicons name="add" size={24} color={COLORS.textSecondary} />
@@ -328,6 +555,7 @@ export default function ChatScreen() {
                   const optimistic: ChatMessage = { _id: `optimistic-${Date.now()}`, sender: { _id: currentUserId }, text: textToSend, createdAt: new Date().toISOString() };
                   setMessages(prev => [...prev, optimistic]);
                   setMessage('');
+                  setShowAISuggestions(false); // Hide AI panel after sending
                   try {
                     const res = await chatService.sendMessage(String(matchId), { type: 'text', text: textToSend });
                     const sent = res?.data?.message || res?.message;
@@ -430,6 +658,12 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderWidth: 1, borderColor: '#E5E7EB',
   },
+  aiButton: { marginRight: 4 },
+  aiButtonGradient: {
+    width: 32, height: 32,
+    borderRadius: 16,
+    alignItems: 'center', justifyContent: 'center',
+  },
   attachButton: { padding: 8, marginRight: 4 },
   micButton: { padding: 8 },
   textInput: {
@@ -445,5 +679,90 @@ const styles = StyleSheet.create({
     marginLeft: 4, marginBottom: 2, // Canh chỉnh với input
     shadowColor: COLORS.primary,
     shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 3, elevation: 3,
+  },
+
+  // AI Suggestions Styles
+  aiContainer: {
+    backgroundColor: COLORS.white,
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
+    paddingVertical: 12,
+  },
+  aiLoadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 20,
+  },
+  aiLoadingText: {
+    marginLeft: 8,
+    fontSize: 13,
+    color: COLORS.textSecondary,
+  },
+  aiHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    marginBottom: 12,
+  },
+  aiHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  aiIcon: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 8,
+  },
+  aiHeaderTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.text,
+  },
+  aiRefreshButton: {
+    padding: 4,
+  },
+  aiSuggestionsContainer: {
+    paddingHorizontal: 16,
+  },
+  aiSuggestionCard: {
+    width: 240,
+    backgroundColor: COLORS.secondary,
+    borderRadius: 16,
+    padding: 12,
+    marginRight: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  aiSuggestionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  aiStyleIndicator: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 6,
+  },
+  aiStyleText: {
+    fontSize: 16,
+  },
+  aiSuggestionText: {
+    fontSize: 14,
+    color: COLORS.text,
+    lineHeight: 20,
+    marginBottom: 8,
+  },
+  aiBasedOnText: {
+    fontSize: 11,
+    color: COLORS.textSecondary,
+    fontStyle: 'italic',
   },
 });

@@ -4,11 +4,13 @@ import {
   Ionicons,
   MaterialCommunityIcons,
 } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import { Stack, useFocusEffect, useRouter } from "expo-router";
 import React, { useCallback, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Animated,
   Image,
   RefreshControl,
   ScrollView,
@@ -16,9 +18,7 @@ import {
   Text,
   TouchableOpacity,
   View,
-  Animated,
 } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
 import { authService } from "../../../services/authService";
 import { userService } from "../../../services/userService";
 
@@ -337,6 +337,7 @@ export default function ProfileScreen() {
                 </View>
               </View>
             )}
+
           </View>
 
           {/* Logout Button */}
@@ -510,24 +511,24 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   logoutButton: {
-  flexDirection: "row",
-  alignItems: "center",
-  justifyContent: "center",
-  backgroundColor: COLORS.primary,
-  paddingVertical: 12,
-  borderRadius: 25,
-  marginTop: 20,
-  marginHorizontal: 16,
-  shadowColor: COLORS.shadow,
-  shadowOffset: { width: 0, height: 4 },
-  shadowOpacity: 0.2,
-  shadowRadius: 8,
-  elevation: 5,
-},
-logoutButtonText: {
-  color: COLORS.white,
-  fontWeight: "700",
-  fontSize: 16,
-  marginLeft: 8,
-},
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: COLORS.primary,
+    paddingVertical: 12,
+    borderRadius: 25,
+    marginTop: 20,
+    marginHorizontal: 16,
+    shadowColor: COLORS.shadow,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  logoutButtonText: {
+    color: COLORS.white,
+    fontWeight: "700",
+    fontSize: 16,
+    marginLeft: 8,
+  },
 });
