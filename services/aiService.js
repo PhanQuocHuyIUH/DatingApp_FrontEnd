@@ -1,8 +1,7 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const API_URL = 'https://datingapp-backend-0khx.onrender.com/api'; // Android emulator
-// const API_URL = 'http://localhost:5000/api'; // iOS simulator
+const API_URL = 'https://datingapp-backend-0khx.onrender.com/api';
 
 class AIService {
   async getAuthHeaders() {

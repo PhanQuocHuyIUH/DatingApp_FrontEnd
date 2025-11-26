@@ -1,7 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
 
-// API URL từ environment variable (dễ chuyển đổi khi build)
 const API_URL = "https://datingapp-backend-0khx.onrender.com/api";
 console.log("📡 API URL:", API_URL);
 

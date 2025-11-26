@@ -2,8 +2,7 @@ import { io } from 'socket.io-client';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../api/config';
 
-// Derive base URL (remove trailing /api if present)
-const API_BASE = api?.defaults?.baseURL?.replace(/\/api$/, '') || 'http://localhost:3000';
+const API_BASE = api?.defaults?.baseURL?.replace(/\/api$/, '') || 'https://datingapp-backend-0khx.onrender.com';
 
 let socket = null;
 let typingTimeouts = {};
